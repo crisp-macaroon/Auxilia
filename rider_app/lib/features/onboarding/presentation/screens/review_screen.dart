@@ -181,11 +181,10 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
   @override
   Widget build(BuildContext context) {
     final onboarding = ref.watch(onboardingProvider);
-    final zone = onboarding.selectedZone;
-    final basePremium = onboarding.persona == 'qcommerce' ? 149 : 99;
-    final multiplier = zone?.basePremiumFactor ?? 1.0;
-    final addOn = 20;
-    final total = (basePremium * multiplier + addOn).round();
+    const basePremium = 99;
+    const gstRate = 0.18;
+    final gstAmount = (basePremium * gstRate).round();
+    final total = basePremium + gstAmount;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -193,7 +192,7 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
         backgroundColor: Colors.transparent,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => context.go(AppRoutes.zone),
+          onPressed: () => context.go(AppRoutes.profile),
         ),
       ),
       body: SafeArea(
@@ -214,12 +213,12 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
 
               const SizedBox(height: 8),
 
-              Text(
-                'Dynamic premium based on your zone risk score',
-                style: AppTypography.bodyMedium.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ).animate(delay: 100.ms).fadeIn(),
+                Text(
+                  'Fixed weekly base premium for every rider.',
+                  style: AppTypography.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ).animate(delay: 100.ms).fadeIn(),
 
               const SizedBox(height: 32),
 
@@ -242,23 +241,18 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
                     ),
                     child: Column(
                       children: [
-                        _buildPremiumRow('Base premium', 'Rs $basePremium'),
+                        _buildPremiumRow('Base premium (1 week)', 'Rs $basePremium'),
                         const Divider(height: 24),
                         _buildPremiumRow(
-                          'Zone risk multiplier (${zone?.name ?? 'Selected zone'})',
-                          '×${multiplier.toStringAsFixed(1)}',
-                        ),
-                        const Divider(height: 24),
-                        _buildPremiumRow(
-                          'Predictive add-on (7-day forecast)',
-                          '+ Rs $addOn',
+                          'GST (18%)',
+                          '+ Rs $gstAmount',
                         ),
                         const Divider(height: 24),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              'Total / week',
+                               'Total / week (incl. tax)',
                               style: AppTypography.titleMedium.copyWith(
                                 color: AppColors.warning,
                                 fontWeight: FontWeight.w700,
@@ -354,6 +348,14 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
                         ),
                 ),
               ).animate(delay: 400.ms).fadeIn(),
+
+              const SizedBox(height: 10),
+                Text(
+                  'Tax is included in checkout total. Policy premium remains Rs 99/week.',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
 
               const SizedBox(height: 16),
             ],

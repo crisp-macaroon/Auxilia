@@ -239,6 +239,17 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
                     );
                   }
                 },
+                onTestPolicyExpired: () async {
+                  await _notificationService.notifyPolicyExpired();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Policy expired notification sent!'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                },
                 onRunFullWorkflow: () async {
                   final rider = await ref.read(currentRiderProvider.future);
                   final policy = await ref.read(activePolicyProvider.future);
@@ -644,6 +655,7 @@ class _TestTriggerCard extends StatelessWidget {
   final VoidCallback onTestMovementAlert;
   final VoidCallback onTestTriggerAlert;
   final VoidCallback onTestClaimPaid;
+  final VoidCallback onTestPolicyExpired;
   final VoidCallback onRunFullWorkflow;
 
   const _TestTriggerCard({
@@ -651,6 +663,7 @@ class _TestTriggerCard extends StatelessWidget {
     required this.onTestMovementAlert,
     required this.onTestTriggerAlert,
     required this.onTestClaimPaid,
+    required this.onTestPolicyExpired,
     required this.onRunFullWorkflow,
   });
 
@@ -709,6 +722,11 @@ class _TestTriggerCard extends StatelessWidget {
                 label: 'Claim Paid',
                 icon: Icons.paid_rounded,
                 onTap: onTestClaimPaid,
+              ),
+              _TestButton(
+                label: 'Policy Expired',
+                icon: Icons.event_busy_rounded,
+                onTap: onTestPolicyExpired,
               ),
               _TestButton(
                 label: 'Full Workflow',
@@ -1066,7 +1084,9 @@ class _ContactCard extends StatelessWidget {
                   label: 'Email',
                   onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('support@auxilia.sabarixr.me')),
+                      const SnackBar(
+                        content: Text('support@auxilia.sabarixr.me'),
+                      ),
                     );
                   },
                 ),

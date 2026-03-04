@@ -350,7 +350,17 @@ final architectureProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   final api = ref.watch(apiServiceProvider);
   final response = await api.getArchitecture();
   if (response.success && response.data != null) return response.data!;
-  return {'architecture': {}, 'pipeline': []};
+  return {
+    'architecture': {},
+    'pipeline': [
+      'Rider opens app and location tracking starts',
+      'Rider performs delivery check-in with destination',
+      'Backend maps trip to nearest coverage zone',
+      'Risk engine evaluates weather, traffic, and incidents',
+      'Trigger engine monitors claim-eligible events',
+      'Claims and policy status sync to rider dashboard',
+    ],
+  };
 });
 
 /// Movement state for live tracking

@@ -7,6 +7,7 @@ import '../../../../core/theme/theme.dart';
 import '../../../../core/constants/constants.dart';
 import '../../../../core/providers/providers.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../shared/models/models.dart';
 
 /// Profile input screen
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -225,6 +226,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 child: ElevatedButton(
                   onPressed: _isValid
                       ? () {
+                          final onboarding = ref.read(onboardingProvider);
                           ref
                               .read(onboardingProvider.notifier)
                               .setProfile(
@@ -232,7 +234,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 phone: _phoneController.text.trim(),
                                 password: _passwordController.text,
                               );
-                          context.go(AppRoutes.zone);
+                          ref.read(onboardingProvider.notifier).setZone(
+                            Zone(
+                              id: 'route_pending',
+                              name: 'Route risk at delivery start',
+                              city: 'Dynamic route',
+                              state: null,
+                              country: 'IN',
+                              latitude: 0,
+                              longitude: 0,
+                              radiusKm: 0,
+                              riskLevel: 'medium',
+                              basePremiumFactor: onboarding.persona == 'qcommerce'
+                                  ? 1.15
+                                  : 1.1,
+                              isActive: true,
+                            ),
+                          );
+                          context.go(AppRoutes.review);
                         }
                       : null,
                   style: ElevatedButton.styleFrom(

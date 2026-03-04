@@ -17,7 +17,7 @@ class _RouteRiskScreenState extends ConsumerState<RouteRiskScreen> {
   final MapController _mapController = MapController();
   LatLng? _currentLocation;
   LatLng? _deliveryLocation;
-  
+
   List<LatLng> _path = [];
   List<Map<String, dynamic>> _incidents = [];
   double _riskScore = 0.0;
@@ -51,12 +51,12 @@ class _RouteRiskScreenState extends ConsumerState<RouteRiskScreen> {
 
   Future<void> _calculateRouteRisk() async {
     if (_currentLocation == null || _deliveryLocation == null) return;
-    
+
     setState(() => _isLoading = true);
     try {
       final riderId = await ref.read(currentRiderIdProvider.future);
       if (riderId == null) return;
-      
+
       final api = ref.read(apiServiceProvider);
       final response = await api.postJson('/riders/$riderId/route-risk', {
         'rider_latitude': _currentLocation!.latitude,
@@ -64,13 +64,15 @@ class _RouteRiskScreenState extends ConsumerState<RouteRiskScreen> {
         'delivery_latitude': _deliveryLocation!.latitude,
         'delivery_longitude': _deliveryLocation!.longitude,
       });
-      
+
       setState(() {
         _path = (response['path_coordinates'] as List)
-            .map((p) => LatLng(p[0] as double, p[1] as double))
+            .map(
+              (p) => LatLng((p[0] as num).toDouble(), (p[1] as num).toDouble()),
+            )
             .toList();
         _incidents = List<Map<String, dynamic>>.from(response['incidents']);
-        _riskScore = response['overall_risk_score'] as double;
+        _riskScore = (response['overall_risk_score'] as num).toDouble();
       });
     } catch (e) {
       if (!mounted) return;
@@ -91,7 +93,9 @@ class _RouteRiskScreenState extends ConsumerState<RouteRiskScreen> {
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
-              initialCenter: _currentLocation ?? const LatLng(19.0760, 72.8777), // Mumbai default
+              initialCenter:
+                  _currentLocation ??
+                  const LatLng(19.0760, 72.8777), // Mumbai default
               initialZoom: 13.0,
               onTap: (tapPosition, point) {
                 setState(() => _deliveryLocation = point);
@@ -114,13 +118,23 @@ class _RouteRiskScreenState extends ConsumerState<RouteRiskScreen> {
                 ),
               if (_incidents.isNotEmpty)
                 CircleLayer(
-                  circles: _incidents.map((incident) => CircleMarker(
-                    point: LatLng(incident['lat'] as double, incident['lon'] as double),
-                    color: Colors.red.withOpacity(0.3 * (incident['severity'] as double)),
-                    radius: 1000 * (incident['severity'] as double),
-                    borderColor: Colors.red,
-                    borderStrokeWidth: 2,
-                  )).toList(),
+                  circles: _incidents
+                      .map(
+                        (incident) => CircleMarker(
+                          point: LatLng(
+                            (incident['lat'] as num).toDouble(),
+                            (incident['lon'] as num).toDouble(),
+                          ),
+                          color: Colors.red.withOpacity(
+                            0.3 * (incident['severity'] as num).toDouble(),
+                          ),
+                          radius:
+                              1000 * (incident['severity'] as num).toDouble(),
+                          borderColor: Colors.red,
+                          borderStrokeWidth: 2,
+                        ),
+                      )
+                      .toList(),
                 ),
               MarkerLayer(
                 markers: [
@@ -129,20 +143,28 @@ class _RouteRiskScreenState extends ConsumerState<RouteRiskScreen> {
                       point: _currentLocation!,
                       width: 40,
                       height: 40,
-                      child: const Icon(Icons.motorcycle, color: AppColors.primary, size: 30),
+                      child: const Icon(
+                        Icons.motorcycle,
+                        color: AppColors.primary,
+                        size: 30,
+                      ),
                     ),
                   if (_deliveryLocation != null)
                     Marker(
                       point: _deliveryLocation!,
                       width: 40,
                       height: 40,
-                      child: const Icon(Icons.location_on, color: Colors.red, size: 40),
+                      child: const Icon(
+                        Icons.location_on,
+                        color: Colors.red,
+                        size: 40,
+                      ),
                     ),
                 ],
               ),
             ],
           ),
-          
+
           if (_deliveryLocation == null)
             Positioned(
               top: 16,
@@ -161,7 +183,7 @@ class _RouteRiskScreenState extends ConsumerState<RouteRiskScreen> {
                 ),
               ),
             ),
-            
+
           if (_deliveryLocation != null)
             Positioned(
               bottom: 24,
@@ -177,7 +199,9 @@ class _RouteRiskScreenState extends ConsumerState<RouteRiskScreen> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
-                        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8)],
+                        boxShadow: [
+                          BoxShadow(color: Colors.black12, blurRadius: 8),
+                        ],
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -185,14 +209,20 @@ class _RouteRiskScreenState extends ConsumerState<RouteRiskScreen> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Route Risk Score', style: TextStyle(color: Colors.grey)),
+                              const Text(
+                                'Route Risk Score',
+                                style: TextStyle(color: Colors.grey),
+                              ),
                               Text(
                                 '${(_riskScore * 100).toStringAsFixed(1)}%',
                                 style: TextStyle(
-                                  fontSize: 24, 
+                                  fontSize: 24,
                                   fontWeight: FontWeight.bold,
-                                  color: _riskScore > 0.6 ? Colors.red : 
-                                         _riskScore > 0.3 ? Colors.orange : Colors.green,
+                                  color: _riskScore > 0.6
+                                      ? Colors.red
+                                      : _riskScore > 0.3
+                                      ? Colors.orange
+                                      : Colors.green,
                                 ),
                               ),
                             ],
@@ -200,10 +230,16 @@ class _RouteRiskScreenState extends ConsumerState<RouteRiskScreen> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              const Text('Incidents', style: TextStyle(color: Colors.grey)),
+                              const Text(
+                                'Incidents',
+                                style: TextStyle(color: Colors.grey),
+                              ),
                               Text(
                                 '${_incidents.length}',
-                                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ],
                           ),
@@ -217,11 +253,23 @@ class _RouteRiskScreenState extends ConsumerState<RouteRiskScreen> {
                       onPressed: _isLoading ? null : _calculateRouteRisk,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
-                      child: _isLoading 
-                          ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.white)) 
-                          : const Text('Analyze Route Risk', style: TextStyle(fontSize: 16, color: Colors.white)),
+                      child: _isLoading
+                          ? const CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            )
+                          : const Text(
+                              'Analyze Route Risk',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.white,
+                              ),
+                            ),
                     ),
                   ),
                 ],

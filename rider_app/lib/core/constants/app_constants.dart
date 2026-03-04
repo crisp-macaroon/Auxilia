@@ -3,7 +3,7 @@ class ApiConstants {
   ApiConstants._();
 
   // Base URLs
-  static const String baseUrl = 'http://localhost:8000/api/v1';
+  static const String baseUrl = 'http://192.168.1.9:8000/api/v1';
   static const String productionUrl = 'https://api.auxilia.app/api/v1';
 
   // Endpoints

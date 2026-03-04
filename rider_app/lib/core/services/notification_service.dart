@@ -207,6 +207,18 @@ class NotificationService {
     );
   }
 
+  /// Policy expired
+  Future<void> notifyPolicyExpired() async {
+    await show(
+      id: 1008,
+      title: 'Policy Expired',
+      body:
+          'Your coverage has expired. Renew now to reactivate protection and claim eligibility.',
+      payload: 'policy_expired',
+      importance: NotificationImportance.high,
+    );
+  }
+
   /// Test notification - for demo purposes
   Future<void> sendTestNotification() async {
     await show(

@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/providers/providers.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../shared/models/models.dart';
 
@@ -92,15 +94,19 @@ class DashboardScreen extends ConsumerWidget {
                     );
                   }
 
-                  return const _EmptyCard(
+                  return _EmptyCard(
                     title: 'No active policy yet',
-                    subtitle: 'Finish onboarding to activate your coverage.',
+                    subtitle: 'Buy your first weekly policy to activate coverage.',
+                    actionLabel: 'Buy Policy',
+                    onAction: () => context.go(AppRoutes.policy),
                   );
                 },
                 loading: () => const _CardSkeleton(height: 220),
-                error: (_, _) => const _EmptyCard(
+                error: (_, _) => _EmptyCard(
                   title: 'No active policy yet',
-                  subtitle: 'Finish onboarding to activate your coverage.',
+                  subtitle: 'Buy your first weekly policy to activate coverage.',
+                  actionLabel: 'Buy Policy',
+                  onAction: () => context.go(AppRoutes.policy),
                 ),
               ),
               const SizedBox(height: 24),
@@ -824,8 +830,15 @@ class _TriggerCard extends StatelessWidget {
 class _EmptyCard extends StatelessWidget {
   final String title;
   final String subtitle;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
-  const _EmptyCard({required this.title, required this.subtitle});
+  const _EmptyCard({
+    required this.title,
+    required this.subtitle,
+    this.actionLabel,
+    this.onAction,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -847,6 +860,16 @@ class _EmptyCard extends StatelessWidget {
               color: AppColors.textSecondary,
             ),
           ),
+          if (actionLabel != null && onAction != null) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: onAction,
+                child: Text(actionLabel!),
+              ),
+            ),
+          ],
         ],
       ),
     );

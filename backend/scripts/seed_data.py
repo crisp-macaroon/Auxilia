@@ -476,7 +476,7 @@ async def seed_transactions(session: AsyncSession, claims: list):
             tx_hash=f"0x{uuid.uuid4().hex}",
             from_address=f"0x{uuid.uuid4().hex[:40]}",
             to_address="0x742d35Cc6634C0532925a3b844Bc9e7595f2bD78",
-            amount=random.choice([99, 149, 199]),
+            amount=random.choice([99, 199]),
             gas_used=round(random.uniform(21000, 35000), 0),
             status="confirmed",
             created_at=random_date(30, 0),

@@ -33,8 +33,8 @@ def generate_policy_hash(policy_id: str, rider_id: str, zone_id: str, premium: f
 
 # Premium configuration (WEEKLY basis as per golden rules)
 BASE_PREMIUM = {
-    PersonaType.QCOMMERCE: 99.0,      # Rs 99/week for Q-Commerce (Zepto/Blinkit)
-    PersonaType.FOOD_DELIVERY: 79.0   # Rs 79/week for food delivery (secondary)
+    PersonaType.QCOMMERCE: 99.0,      # Rs 99/week baseline
+    PersonaType.FOOD_DELIVERY: 99.0   # Rs 99/week baseline
 }
 
 COVERAGE_AMOUNTS = {
@@ -478,9 +478,9 @@ async def calculate_premium(
         pricing_note = "Base weekly premium retained for balanced local risk"
         recommended_coverage_hours = BASE_COVERAGE_HOURS.get(persona, 48)
 
-    # Calculate final premium (keep weekly pricing stable and easy to explain)
+    # Calculate final premium (fixed weekly base for rider-facing simplicity)
     weeks = max(1, duration_days / 7)
-    weekly_premium = max(base_premium - 4, min(base_premium + 8, base_premium + weekly_adjustment))
+    weekly_premium = base_premium
     final_premium = weekly_premium * duration_factor * weeks
     final_premium = round(final_premium, 2)
     

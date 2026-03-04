@@ -480,6 +480,7 @@ async def get_architecture_and_pipeline():
             "TriggerAgent evaluates parametric conditions",
             "FraudAgent verifies delivery-zone eligibility and claim consistency",
             "PayoutAgent decides payout; approved claims get ledger hash",
+            "Policy state syncs to rider dashboard with renewal prompts",
             "Admin dashboard shows live zone heat map + metrics",
         ],
     }

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 import '../../../../core/providers/providers.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../shared/models/models.dart';
 
@@ -70,8 +72,15 @@ class PolicyScreen extends ConsumerWidget {
                 // Policy Actions
                 policyAsync.when(
                   data: (policy) {
-                    final effectivePolicy = policy ?? latestPolicyAsync.valueOrNull;
-                    if (effectivePolicy == null) return const SizedBox.shrink();
+                    final latestPolicy = latestPolicyAsync.valueOrNull;
+                    final effectivePolicy = policy ?? latestPolicy;
+                    if (effectivePolicy == null) {
+                      return _BuyPolicyAction(
+                        rider: riderAsync.valueOrNull,
+                        onRequireOnboarding: () =>
+                            context.go(AppRoutes.onboarding),
+                      );
+                    }
                     return _PolicyActions(policy: effectivePolicy);
                   },
                   loading: () => const SizedBox.shrink(),
@@ -82,7 +91,8 @@ class PolicyScreen extends ConsumerWidget {
                 policyAsync
                     .when(
                       data: (policy) {
-                        final effectivePolicy = policy ?? latestPolicyAsync.valueOrNull;
+                        final effectivePolicy =
+                            policy ?? latestPolicyAsync.valueOrNull;
                         if (effectivePolicy == null) {
                           return const SizedBox.shrink();
                         }
@@ -177,12 +187,6 @@ class _PolicyDetailsCard extends StatelessWidget {
 
   const _PolicyDetailsCard({required this.policy});
 
-  double get _weeklyPremium {
-    final totalDays = policy.endDate.difference(policy.startDate).inDays;
-    final weeks = totalDays <= 0 ? 1.0 : (totalDays / 7).clamp(1, 52).toDouble();
-    return policy.premium / weeks;
-  }
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -196,10 +200,7 @@ class _PolicyDetailsCard extends StatelessWidget {
         children: [
           _buildDetailRow('Zone', policy.zoneId),
           _buildDivider(),
-          _buildDetailRow(
-            'Premium',
-            'Rs ${_weeklyPremium.toStringAsFixed(0)} / week',
-          ),
+          _buildDetailRow('Weekly Base', 'Rs 99 + taxes'),
           _buildDivider(),
           _buildDetailRow(
             'Total Paid',
@@ -302,20 +303,22 @@ class _PolicyActions extends ConsumerStatefulWidget {
 }
 
 class _PolicyActionsState extends ConsumerState<_PolicyActions> {
+  static const double _baseWeeklyPremium = 99.0;
+  static const double _gstRate = 0.18;
+
   bool _loading = false;
   late final Razorpay _razorpay;
   int? _pendingWeeks;
   Map<String, dynamic>? _pendingOrder;
 
-  double get _weeklyPremium {
-    final totalDays = widget.policy.endDate.difference(widget.policy.startDate).inDays;
-    final weeks = totalDays <= 0 ? 1.0 : (totalDays / 7).clamp(1, 52).toDouble();
-    return widget.policy.premium / weeks;
-  }
-
   double _quoteForWeeks(int weeks) {
-    final discountFactor = weeks >= 4 ? 0.85 : weeks >= 2 ? 0.95 : 1.0;
-    return _weeklyPremium * weeks * discountFactor;
+    final discountFactor = weeks >= 4
+        ? 0.85
+        : weeks >= 2
+        ? 0.95
+        : 1.0;
+    final premiumExcludingTax = _baseWeeklyPremium * weeks * discountFactor;
+    return premiumExcludingTax * (1 + _gstRate);
   }
 
   @override
@@ -351,7 +354,9 @@ class _PolicyActionsState extends ConsumerState<_PolicyActions> {
       setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(orderResponse.error ?? 'Failed to start renewal payment'),
+          content: Text(
+            orderResponse.error ?? 'Failed to start renewal payment',
+          ),
           backgroundColor: AppColors.danger,
         ),
       );
@@ -467,7 +472,9 @@ class _PolicyActionsState extends ConsumerState<_PolicyActions> {
     setState(() => _loading = false);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${response.walletName ?? 'External wallet'} is not supported'),
+        content: Text(
+          '${response.walletName ?? 'External wallet'} is not supported',
+        ),
         backgroundColor: AppColors.warning,
       ),
     );
@@ -515,13 +522,32 @@ class _PolicyActionsState extends ConsumerState<_PolicyActions> {
               ),
             ),
           ],
+          if (!widget.policy.isActive) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.warning.withOpacity(0.25)),
+              ),
+              child: Text(
+                'Coverage is paused after expiry. Claims are re-enabled right after successful renewal.',
+                style: AppTypography.bodySmall.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
                 child: _ActionButton(
                   label: '1 Week',
-                  subtitle: 'Rs ${_quoteForWeeks(1).toStringAsFixed(0)}',
+                  subtitle:
+                      'Rs ${_quoteForWeeks(1).toStringAsFixed(0)} incl. tax',
                   onTap: _loading ? null : () => _renewPolicy(1),
                   isPrimary: true,
                 ),
@@ -530,7 +556,8 @@ class _PolicyActionsState extends ConsumerState<_PolicyActions> {
               Expanded(
                 child: _ActionButton(
                   label: '2 Weeks',
-                  subtitle: 'Rs ${_quoteForWeeks(2).toStringAsFixed(0)}',
+                  subtitle:
+                      'Rs ${_quoteForWeeks(2).toStringAsFixed(0)} incl. tax',
                   onTap: _loading ? null : () => _renewPolicy(2),
                 ),
               ),
@@ -538,7 +565,8 @@ class _PolicyActionsState extends ConsumerState<_PolicyActions> {
               Expanded(
                 child: _ActionButton(
                   label: '4 Weeks',
-                  subtitle: 'Rs ${_quoteForWeeks(4).toStringAsFixed(0)}',
+                  subtitle:
+                      'Rs ${_quoteForWeeks(4).toStringAsFixed(0)} incl. tax',
                   onTap: _loading ? null : () => _renewPolicy(4),
                 ),
               ),
@@ -602,6 +630,231 @@ class _ActionButton extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _BuyPolicyAction extends ConsumerStatefulWidget {
+  final Rider? rider;
+  final VoidCallback onRequireOnboarding;
+
+  const _BuyPolicyAction({
+    required this.rider,
+    required this.onRequireOnboarding,
+  });
+
+  @override
+  ConsumerState<_BuyPolicyAction> createState() => _BuyPolicyActionState();
+}
+
+class _BuyPolicyActionState extends ConsumerState<_BuyPolicyAction> {
+  bool _loading = false;
+  late final Razorpay _razorpay;
+  Map<String, dynamic>? _pendingOrder;
+
+  @override
+  void initState() {
+    super.initState();
+    _razorpay = Razorpay();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+  }
+
+  @override
+  void dispose() {
+    _razorpay.clear();
+    super.dispose();
+  }
+
+  Future<void> _buyPolicy() async {
+    final rider = widget.rider;
+    if (rider == null) {
+      widget.onRequireOnboarding();
+      return;
+    }
+
+    setState(() => _loading = true);
+    final api = ref.read(apiServiceProvider);
+
+    final orderResponse = await api.createPolicyPaymentOrder(
+      flowType: 'new_policy',
+      riderId: rider.id,
+      zoneId: rider.zoneId,
+      persona: rider.persona,
+      durationDays: 7,
+    );
+
+    if (!mounted) return;
+
+    if (!orderResponse.success || orderResponse.data == null) {
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            orderResponse.error ?? 'Failed to start policy payment',
+          ),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+      return;
+    }
+
+    _pendingOrder = orderResponse.data;
+
+    if ((orderResponse.data!['checkout_mode'] ?? 'sandbox') == 'sandbox') {
+      await _confirmPurchase(
+        orderId: orderResponse.data!['order_id'] as String,
+        paymentId: 'sandbox_payment_${DateTime.now().millisecondsSinceEpoch}',
+        signature: 'sandbox_signature',
+      );
+      return;
+    }
+
+    _razorpay.open({
+      'key': orderResponse.data!['key_id'],
+      'amount': orderResponse.data!['amount'],
+      'name': 'Auxilia',
+      'description': 'Weekly rider protection plan',
+      'order_id': orderResponse.data!['order_id'],
+      'prefill': orderResponse.data!['prefill'] ?? {},
+      'theme': {'color': '#F97316'},
+    });
+  }
+
+  Future<void> _confirmPurchase({
+    required String orderId,
+    required String paymentId,
+    String? signature,
+  }) async {
+    final rider = widget.rider;
+    if (rider == null || _pendingOrder == null) {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+      return;
+    }
+
+    final api = ref.read(apiServiceProvider);
+    final response = await api.confirmPolicyPayment(
+      flowType: 'new_policy',
+      orderId: orderId,
+      paymentId: paymentId,
+      signature: signature,
+      riderId: rider.id,
+      zoneId: rider.zoneId,
+      persona: rider.persona,
+      durationDays: 7,
+    );
+
+    if (!mounted) return;
+
+    setState(() => _loading = false);
+
+    if (response.success) {
+      ref.invalidate(activePolicyProvider);
+      ref.invalidate(latestPolicyProvider);
+      ref.invalidate(claimsProvider);
+      ref.invalidate(claimsSummaryProvider);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Policy activated successfully!'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(response.error ?? 'Failed to activate policy'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+    }
+  }
+
+  void _handlePaymentSuccess(PaymentSuccessResponse response) {
+    final fallbackOrderId = _pendingOrder?['order_id'] as String?;
+    final orderId = response.orderId ?? fallbackOrderId;
+    if (orderId == null) {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+      return;
+    }
+
+    _confirmPurchase(
+      orderId: orderId,
+      paymentId: response.paymentId ?? '',
+      signature: response.signature,
+    );
+  }
+
+  void _handlePaymentError(PaymentFailureResponse response) {
+    if (!mounted) return;
+    setState(() => _loading = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(response.message ?? 'Payment cancelled'),
+        backgroundColor: AppColors.danger,
+      ),
+    );
+  }
+
+  void _handleExternalWallet(ExternalWalletResponse response) {
+    if (!mounted) return;
+    setState(() => _loading = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '${response.walletName ?? 'External wallet'} is not supported',
+        ),
+        backgroundColor: AppColors.warning,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('No active policy', style: AppTypography.titleSmall),
+          const SizedBox(height: 6),
+          Text(
+            widget.rider == null
+                ? 'Complete onboarding to activate your first weekly policy.'
+                : 'Reactivate your weekly policy for Rs 99 + taxes.',
+            style: AppTypography.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _loading
+                  ? null
+                  : widget.rider == null
+                  ? widget.onRequireOnboarding
+                  : _buyPolicy,
+              child: Text(
+                _loading
+                    ? 'Starting checkout...'
+                    : widget.rider == null
+                    ? 'Complete Onboarding'
+                    : 'Activate Policy',
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

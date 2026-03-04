@@ -107,7 +107,11 @@ async def create_policy_payment_order(
         db=db,
     )
 
-    amount_paise = int(round(premium_calc["final_premium"] * 100))
+    premium_value = float(premium_calc["final_premium"])
+    gst_rate = 0.18
+    gst_amount = round(premium_value * gst_rate, 2)
+    total_amount = round(premium_value + gst_amount, 2)
+    amount_paise = int(round(total_amount * 100))
     receipt = f"aux-{payload.flow_type.value}-{str(uuid.uuid4())[:12]}"
     notes = {
         "flow_type": payload.flow_type.value,
@@ -115,6 +119,9 @@ async def create_policy_payment_order(
         "zone_id": ctx["zone_id"],
         "persona": ctx["persona"].value,
         "duration_days": str(ctx["duration_days"]),
+        "premium": str(premium_value),
+        "gst": str(gst_amount),
+        "tax_rate": "0.18",
     }
     if payload.existing_policy_id:
         notes["existing_policy_id"] = payload.existing_policy_id
