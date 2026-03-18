@@ -1,50 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
+import '../../../../core/providers/providers.dart';
 import '../../../../core/theme/theme.dart';
+import '../../../../shared/models/models.dart';
 
-/// Claims history screen
-class ClaimsScreen extends StatelessWidget {
+class ClaimsScreen extends ConsumerWidget {
   const ClaimsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final claims = [
-      {
-        'icon': Icons.water_drop_rounded,
-        'color': AppColors.primary,
-        'title': 'Heavy Rain - Andheri-East',
-        'date': 'Mar 14, 2026 • 14:32',
-        'tx': '0x8f3e...a21c',
-        'amount': 300,
-        'status': 'paid',
-      },
-      {
-        'icon': Icons.trending_down_rounded,
-        'color': AppColors.danger,
-        'title': 'Zone Activity Drop - Zone 3',
-        'date': 'Mar 10, 2026 • 09:17',
-        'tx': '0x4c2b...f90a',
-        'amount': 300,
-        'status': 'paid',
-      },
-      {
-        'icon': Icons.block_rounded,
-        'color': AppColors.warning,
-        'title': 'Curfew Alert - Strike Detected',
-        'date': 'Mar 3, 2026 • 11:55',
-        'tx': '0x2d7a...b33e',
-        'amount': 300,
-        'status': 'paid',
-      },
-    ];
+  Widget build(BuildContext context, WidgetRef ref) {
+    final claimsAsync = ref.watch(claimsProvider);
+    final summaryAsync = ref.watch(claimsSummaryProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
-            // Header
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -54,7 +29,7 @@ class ClaimsScreen extends StatelessWidget {
                     Text('Claim History', style: AppTypography.displaySmall),
                     const SizedBox(height: 8),
                     Text(
-                      'All your approved claims with blockchain proof',
+                      'All approved and in-flight claim activity from the backend.',
                       style: AppTypography.bodyMedium.copyWith(
                         color: AppColors.textSecondary,
                       ),
@@ -63,108 +38,146 @@ class ClaimsScreen extends StatelessWidget {
                 ),
               ),
             ),
-
-            // Summary card
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: AppColors.shieldGradient,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.success.withOpacity(0.3),
-                        blurRadius: 20,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          color: AppColors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: const Icon(
-                          Icons.account_balance_wallet_rounded,
-                          color: AppColors.white,
-                          size: 28,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Total Earnings Protected',
-                              style: AppTypography.labelMedium.copyWith(
-                                color: AppColors.white.withOpacity(0.8),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '₹900',
-                              style: AppTypography.displayMedium.copyWith(
-                                color: AppColors.white,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            '3',
-                            style: AppTypography.displaySmall.copyWith(
-                              color: AppColors.white,
-                            ),
-                          ),
-                          Text(
-                            'Claims',
-                            style: AppTypography.labelSmall.copyWith(
-                              color: AppColors.white.withOpacity(0.8),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1),
+                child: summaryAsync.when(
+                  data: (summary) => _SummaryCard(summary: summary),
+                  loading: () => const _LoadingCard(),
+                  error: (_, _) => const _LoadingCard(),
+                ),
               ),
             ),
-
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
-
-            // Claims list
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate((context, index) {
-                  final claim = claims[index];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _buildClaimCard(claim, index),
+            claimsAsync.when(
+              data: (claims) {
+                if (claims.isEmpty) {
+                  return const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 24),
+                      child: _EmptyState(),
+                    ),
                   );
-                }, childCount: claims.length),
+                }
+
+                return SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  sliver: SliverList.builder(
+                    itemCount: claims.length,
+                    itemBuilder: (context, index) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _ClaimCard(claim: claims[index], index: index),
+                    ),
+                  ),
+                );
+              },
+              loading: () => const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 24),
+                  child: _LoadingCard(),
+                ),
+              ),
+              error: (_, _) => const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 24),
+                  child: _EmptyState(
+                    title: 'Unable to load claims',
+                    subtitle:
+                        'Start the backend and seed data to see real claim history.',
+                  ),
+                ),
               ),
             ),
-
             const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildClaimCard(Map<String, dynamic> claim, int index) {
+class _SummaryCard extends StatelessWidget {
+  final Map<String, dynamic> summary;
+
+  const _SummaryCard({required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: AppColors.shieldGradient,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: AppColors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(
+              Icons.account_balance_wallet_rounded,
+              color: AppColors.white,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Total Earnings Protected',
+                  style: AppTypography.labelMedium.copyWith(
+                    color: AppColors.white.withOpacity(0.84),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Rs ${((summary['amount'] ?? 0) as num).toStringAsFixed(0)}',
+                  style: AppTypography.displayMedium.copyWith(
+                    color: AppColors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${summary['paid'] ?? 0}',
+                style: AppTypography.displaySmall.copyWith(
+                  color: AppColors.white,
+                ),
+              ),
+              Text(
+                'Paid',
+                style: AppTypography.labelSmall.copyWith(
+                  color: AppColors.white.withOpacity(0.84),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ).animate().fadeIn().slideY(begin: 0.1);
+  }
+}
+
+class _ClaimCard extends StatelessWidget {
+  final Claim claim;
+  final int index;
+
+  const _ClaimCard({required this.claim, required this.index});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _statusColor(claim.status);
+
     return Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -178,14 +191,10 @@ class ClaimsScreen extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: (claim['color'] as Color).withOpacity(0.1),
+                  color: color.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  claim['icon'] as IconData,
-                  color: claim['color'] as Color,
-                  size: 24,
-                ),
+                child: Icon(_iconForType(claim.triggerType), color: color),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -193,21 +202,25 @@ class ClaimsScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      claim['title'] as String,
+                      '${claim.triggerType.toUpperCase()} trigger',
                       style: AppTypography.titleSmall,
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      claim['date'] as String,
+                      DateFormat('MMM d, yyyy • HH:mm').format(claim.createdAt),
                       style: AppTypography.bodySmall.copyWith(
                         color: AppColors.textTertiary,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'TX: ${claim['tx']}',
+                      claim.txHash != null
+                          ? 'TX: ${claim.txHash}'
+                          : 'Awaiting payout hash',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: AppTypography.monoSmall.copyWith(
-                        color: AppColors.success,
+                        color: color,
                         fontSize: 10,
                       ),
                     ),
@@ -218,9 +231,9 @@ class ClaimsScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    '₹${claim['amount']}',
+                    'Rs ${claim.amount.toStringAsFixed(0)}',
                     style: AppTypography.titleLarge.copyWith(
-                      color: AppColors.success,
+                      color: color,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -231,14 +244,14 @@ class ClaimsScreen extends StatelessWidget {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.success.withOpacity(0.1),
+                      color: color.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      'PAID',
+                      claim.status.toUpperCase(),
                       style: AppTypography.caption.copyWith(
-                        color: AppColors.success,
-                        fontWeight: FontWeight.w600,
+                        color: color,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
@@ -250,5 +263,83 @@ class ClaimsScreen extends StatelessWidget {
         .animate(delay: Duration(milliseconds: 100 * index))
         .fadeIn()
         .slideX(begin: 0.05);
+  }
+
+  IconData _iconForType(String type) {
+    switch (type) {
+      case 'rain':
+        return Icons.water_drop_rounded;
+      case 'traffic':
+        return Icons.traffic_rounded;
+      case 'accident':
+        return Icons.warning_amber_rounded;
+      default:
+        return Icons.trending_down_rounded;
+    }
+  }
+
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'paid':
+      case 'approved':
+        return AppColors.success;
+      case 'rejected':
+        return AppColors.danger;
+      case 'processing':
+        return AppColors.warning;
+      default:
+        return AppColors.primary;
+    }
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _EmptyState({
+    this.title = 'No claims yet',
+    this.subtitle =
+        'Once triggers fire and payouts are created, they will show here.',
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: AppTypography.titleMedium),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            style: AppTypography.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoadingCard extends StatelessWidget {
+  const _LoadingCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 140,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+      ),
+    );
   }
 }

@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../../core/providers/providers.dart';
 import '../../../../core/theme/theme.dart';
 
-/// Profile and settings screen
-class ProfileSettingsScreen extends StatelessWidget {
+class ProfileSettingsScreen extends ConsumerWidget {
   const ProfileSettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final riderAsync = ref.watch(currentRiderProvider);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -18,115 +22,45 @@ class ProfileSettingsScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Profile', style: AppTypography.displaySmall),
-
               const SizedBox(height: 24),
+              riderAsync
+                  .when(
+                    data: (rider) {
+                      if (rider == null) {
+                        return const _MessageCard(
+                          title: 'No rider session',
+                          subtitle:
+                              'Register through onboarding to unlock profile data.',
+                        );
+                      }
 
-              // Profile card
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(
-                        gradient: AppColors.primaryGradient,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Center(
-                        child: Text(
-                          'RK',
-                          style: AppTypography.headlineMedium.copyWith(
-                            color: AppColors.white,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
+                      return _ProfileCard(
+                        name: rider.name,
+                        phone: rider.phone,
+                        persona: rider.persona,
+                      );
+                    },
+                    loading: () => const _LoadingCard(),
+                    error: (_, _) => const _MessageCard(
+                      title: 'Unable to load profile',
+                      subtitle: 'Check the backend connection and try again.',
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Ramesh Kumar', style: AppTypography.titleLarge),
-                          const SizedBox(height: 4),
-                          Text(
-                            '+91 98765 43210',
-                            style: AppTypography.bodySmall.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              'Q-COMMERCE',
-                              style: AppTypography.caption.copyWith(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.edit_rounded),
-                      onPressed: () {},
-                      color: AppColors.textTertiary,
-                    ),
-                  ],
-                ),
-              ).animate().fadeIn(duration: 300.ms),
-
+                  )
+                  .animate()
+                  .fadeIn(),
               const SizedBox(height: 24),
-
-              // Zone Risk Profile
-              Text('Zone Risk Profile', style: AppTypography.titleLarge),
-              const SizedBox(height: 16),
-
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Column(
-                  children: [
-                    _buildRiskBar('Overall Risk', 0.71, AppColors.warning),
-                    const SizedBox(height: 16),
-                    _buildRiskBar('Flood Risk', 0.85, AppColors.danger),
-                    const SizedBox(height: 16),
-                    _buildRiskBar('Heat Risk', 0.55, AppColors.warning),
-                    const SizedBox(height: 16),
-                    _buildRiskBar('Strike Risk', 0.40, AppColors.primary),
-                  ],
-                ),
-              ).animate(delay: 100.ms).fadeIn().slideY(begin: 0.1),
-
+              riderAsync.when(
+                data: (rider) => _RiskCard(riskScore: rider?.riskScore ?? 0),
+                loading: () => const _LoadingCard(height: 170),
+                error: (_, _) => const SizedBox.shrink(),
+              ),
               const SizedBox(height: 24),
-
-              // Settings
               Text('Settings', style: AppTypography.titleLarge),
               const SizedBox(height: 16),
-
               _buildSettingsItem(
                 Icons.notifications_rounded,
                 'Notifications',
-                'Push alerts for triggers & payouts',
+                'Push alerts for triggers and payouts',
                 true,
                 0,
               ),
@@ -138,35 +72,38 @@ class ProfileSettingsScreen extends StatelessWidget {
                 1,
               ),
               _buildSettingsItem(
-                Icons.payment_rounded,
-                'Payment Methods',
-                'UPI: 9876543210@paytm',
+                Icons.shield_outlined,
+                'Coverage feed',
+                'Live backend powered policy updates',
                 false,
                 2,
               ),
               _buildSettingsItem(
                 Icons.help_outline_rounded,
                 'Help & Support',
-                'FAQs, Contact us',
+                'FAQs and support contact',
                 false,
                 3,
               ),
-              _buildSettingsItem(
-                Icons.info_outline_rounded,
-                'About Auxilia',
-                'Version 1.0.0',
-                false,
-                4,
-              ),
-
               const SizedBox(height: 24),
-
-              // Logout button
               SizedBox(
                 width: double.infinity,
                 height: 56,
                 child: OutlinedButton(
-                  onPressed: () {},
+                  onPressed: () async {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.remove('rider_id');
+                    ref.invalidate(currentRiderIdProvider);
+                    ref.invalidate(currentRiderProvider);
+                    ref.invalidate(activePolicyProvider);
+                    ref.invalidate(claimsProvider);
+                    ref.invalidate(claimsSummaryProvider);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Logged out locally')),
+                      );
+                    }
+                  },
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(color: AppColors.danger.withOpacity(0.5)),
                     shape: RoundedRectangleBorder(
@@ -181,48 +118,11 @@ class ProfileSettingsScreen extends StatelessWidget {
                   ),
                 ),
               ).animate(delay: 500.ms).fadeIn(),
-
               const SizedBox(height: 100),
             ],
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildRiskBar(String label, double value, Color color) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              label,
-              style: AppTypography.bodySmall.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-            Text(
-              value.toStringAsFixed(2),
-              style: AppTypography.labelMedium.copyWith(
-                color: color,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: LinearProgressIndicator(
-            value: value,
-            minHeight: 8,
-            backgroundColor: AppColors.border,
-            valueColor: AlwaysStoppedAnimation(color),
-          ),
-        ),
-      ],
     );
   }
 
@@ -285,5 +185,225 @@ class ProfileSettingsScreen extends StatelessWidget {
         .animate(delay: Duration(milliseconds: 200 + (index * 60)))
         .fadeIn()
         .slideX(begin: 0.05);
+  }
+}
+
+class _ProfileCard extends StatelessWidget {
+  final String name;
+  final String phone;
+  final String persona;
+
+  const _ProfileCard({
+    required this.name,
+    required this.phone,
+    required this.persona,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final initials = name
+        .split(' ')
+        .where((part) => part.isNotEmpty)
+        .take(2)
+        .map((part) => part[0])
+        .join();
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              gradient: AppColors.primaryGradient,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Center(
+              child: Text(
+                initials,
+                style: AppTypography.headlineMedium.copyWith(
+                  color: AppColors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name, style: AppTypography.titleLarge),
+                const SizedBox(height: 4),
+                Text(
+                  phone,
+                  style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    persona.toUpperCase(),
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RiskCard extends StatelessWidget {
+  final double riskScore;
+
+  const _RiskCard({required this.riskScore});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Zone Risk Profile', style: AppTypography.titleLarge),
+          const SizedBox(height: 16),
+          _RiskBar(
+            label: 'Overall Risk',
+            value: riskScore,
+            color: AppColors.warning,
+          ),
+          const SizedBox(height: 16),
+          _RiskBar(
+            label: 'Payout Confidence',
+            value: (1 - riskScore).clamp(0, 1),
+            color: AppColors.success,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RiskBar extends StatelessWidget {
+  final String label;
+  final double value;
+  final Color color;
+
+  const _RiskBar({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            Text(
+              value.toStringAsFixed(2),
+              style: AppTypography.labelMedium.copyWith(
+                color: color,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: value,
+            minHeight: 8,
+            backgroundColor: AppColors.border,
+            valueColor: AlwaysStoppedAnimation(color),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MessageCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _MessageCard({required this.title, required this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: AppTypography.titleMedium),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            style: AppTypography.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoadingCard extends StatelessWidget {
+  final double height;
+
+  const _LoadingCard({this.height = 120});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: height,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+      ),
+    );
   }
 }
