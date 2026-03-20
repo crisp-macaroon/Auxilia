@@ -220,6 +220,63 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
                     );
                   }
                 },
+                onRunFullWorkflow: () async {
+                  final rider = await ref.read(currentRiderProvider.future);
+                  final policy = await ref.read(activePolicyProvider.future);
+                  final api = ref.read(apiServiceProvider);
+
+                  if (rider == null || policy == null) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Need active rider + policy first'),
+                        ),
+                      );
+                    }
+                    return;
+                  }
+
+                  const demoLat = 12.9756;
+                  const demoLon = 77.6062;
+                  const orderId = 'ORDER-DEMO-001';
+
+                  final locationRes = await api.updateRiderLocation(
+                    riderId: rider.id,
+                    latitude: demoLat,
+                    longitude: demoLon,
+                  );
+
+                  final checkInRes = await api.deliveryCheckIn(
+                    riderId: rider.id,
+                    orderId: orderId,
+                    deliveryLat: demoLat,
+                    deliveryLon: demoLon,
+                    riderLat: demoLat,
+                    riderLon: demoLon,
+                  );
+
+                  final triggerRes = await api.runTriggerCheck();
+                  final claimRes = await api.createClaim(
+                    policyId: policy.id,
+                    triggerType: 'road_disruption',
+                  );
+
+                  if (context.mounted) {
+                    final msg =
+                        'Workflow done | Location: ${locationRes.success} | Check-in: ${checkInRes.success} | Trigger scan: ${triggerRes.success} | Claim: ${claimRes.success}';
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(msg),
+                        duration: const Duration(seconds: 4),
+                      ),
+                    );
+                  }
+
+                  ref.invalidate(currentRiderProvider);
+                  ref.invalidate(triggersProvider);
+                  ref.invalidate(claimsProvider);
+                  ref.invalidate(claimsSummaryProvider);
+                },
               ).animate(delay: 400.ms).fadeIn(),
 
               const SizedBox(height: 24),
@@ -552,12 +609,14 @@ class _TestTriggerCard extends StatelessWidget {
   final VoidCallback onTestMovementAlert;
   final VoidCallback onTestTriggerAlert;
   final VoidCallback onTestClaimPaid;
+  final VoidCallback onRunFullWorkflow;
 
   const _TestTriggerCard({
     required this.onTestNotification,
     required this.onTestMovementAlert,
     required this.onTestTriggerAlert,
     required this.onTestClaimPaid,
+    required this.onRunFullWorkflow,
   });
 
   @override
@@ -615,6 +674,11 @@ class _TestTriggerCard extends StatelessWidget {
                 label: 'Claim Paid',
                 icon: Icons.paid_rounded,
                 onTap: onTestClaimPaid,
+              ),
+              _TestButton(
+                label: 'Full Workflow',
+                icon: Icons.play_circle_fill_rounded,
+                onTap: onRunFullWorkflow,
               ),
             ],
           ),

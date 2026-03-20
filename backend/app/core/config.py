@@ -36,7 +36,9 @@ class Settings(BaseSettings):
     RAIN_THRESHOLD_MM: float = 50.0
     TRAFFIC_THRESHOLD_PERCENT: float = 60.0
     SURGE_THRESHOLD_MULTIPLIER: float = 2.5
-    ACCIDENT_THRESHOLD_COUNT: int = 3
+    ROAD_DISRUPTION_THRESHOLD_COUNT: int = 3
+    # Legacy fallback (deprecated)
+    ACCIDENT_THRESHOLD_COUNT: Optional[int] = None
     TRIGGER_POLL_INTERVAL: int = 300
     LOCATION_TRACK_INTERVAL_SECONDS: int = 180
     DELIVERY_ZONE_MAX_RADIUS_KM: float = 5.0
@@ -50,7 +52,9 @@ class Settings(BaseSettings):
     RAIN_PAYOUT: int = 150
     TRAFFIC_PAYOUT: int = 100
     SURGE_PAYOUT: int = 200
-    ACCIDENT_PAYOUT: int = 500
+    ROAD_DISRUPTION_PAYOUT: int = 500
+    # Legacy fallback (deprecated)
+    ACCIDENT_PAYOUT: Optional[int] = None
 
     # Optional payout integrations
     RAZORPAY_KEY_ID: str = ""
@@ -63,9 +67,14 @@ class Settings(BaseSettings):
     DEFAULT_COUNTRY: str = "IN"
 
     def model_post_init(self, __context) -> None:
+        if self.ACCIDENT_THRESHOLD_COUNT is not None:
+            self.ROAD_DISRUPTION_THRESHOLD_COUNT = self.ACCIDENT_THRESHOLD_COUNT
+        if self.ACCIDENT_PAYOUT is not None:
+            self.ROAD_DISRUPTION_PAYOUT = self.ACCIDENT_PAYOUT
+
         self.CONGESTION_THRESHOLD = self.TRAFFIC_THRESHOLD_PERCENT
         self.SURGE_THRESHOLD = self.SURGE_THRESHOLD_MULTIPLIER
-        self.INCIDENT_THRESHOLD = self.ACCIDENT_THRESHOLD_COUNT
+        self.INCIDENT_THRESHOLD = self.ROAD_DISRUPTION_THRESHOLD_COUNT
     
     class Config:
         env_file = ".env"

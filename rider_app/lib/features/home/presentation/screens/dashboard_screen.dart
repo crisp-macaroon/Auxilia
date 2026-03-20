@@ -12,6 +12,7 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(locationSyncProvider);
     final riderAsync = ref.watch(currentRiderProvider);
     final policyAsync = ref.watch(activePolicyProvider);
     final claimsSummaryAsync = ref.watch(claimsSummaryProvider);
@@ -187,6 +188,7 @@ class _LocationStatusCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final movement = ref.watch(movementProvider);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -201,7 +203,9 @@ class _LocationStatusCard extends ConsumerWidget {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Tracking active: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}',
+                movement.isMoving
+                    ? 'Moving (${movement.movedMeters.toStringAsFixed(0)}m): ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}'
+                    : 'Tracking active: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}',
                 style: AppTypography.bodySmall,
               ),
             ),

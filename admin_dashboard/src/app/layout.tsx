@@ -23,11 +23,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${poppins.variable} h-full antialiased`}>
-      <body className="flex min-h-full bg-slate-50 font-sans">
+      <body className="flex min-h-full bg-white font-sans">
         <Sidebar />
-        <div className="ml-64 flex-1 transition-all duration-300">
+        <div className="ml-64 flex-1 bg-white transition-all duration-300">
           <Header />
-          <main className="p-6">{children}</main>
+          <main className="min-h-[calc(100vh-4rem)] bg-white p-6">{children}</main>
         </div>
       </body>
     </html>

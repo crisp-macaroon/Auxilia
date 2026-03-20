@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
+import 'dart:math' as math;
 import '../services/api_service.dart';
 import '../../shared/models/models.dart';
 
@@ -294,6 +295,93 @@ final architectureProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   final response = await api.getArchitecture();
   if (response.success && response.data != null) return response.data!;
   return {'architecture': {}, 'pipeline': []};
+});
+
+/// Movement state for live tracking
+class MovementState {
+  final Position? current;
+  final Position? previous;
+  final double movedMeters;
+  final bool isMoving;
+  final DateTime? lastUpdatedAt;
+
+  const MovementState({
+    this.current,
+    this.previous,
+    this.movedMeters = 0,
+    this.isMoving = false,
+    this.lastUpdatedAt,
+  });
+
+  MovementState copyWith({
+    Position? current,
+    Position? previous,
+    double? movedMeters,
+    bool? isMoving,
+    DateTime? lastUpdatedAt,
+  }) {
+    return MovementState(
+      current: current ?? this.current,
+      previous: previous ?? this.previous,
+      movedMeters: movedMeters ?? this.movedMeters,
+      isMoving: isMoving ?? this.isMoving,
+      lastUpdatedAt: lastUpdatedAt ?? this.lastUpdatedAt,
+    );
+  }
+}
+
+final movementProvider = StateProvider<MovementState>(
+  (_) => const MovementState(),
+);
+
+double _distanceMeters(Position a, Position b) {
+  const earthRadius = 6371000.0;
+  final dLat = (b.latitude - a.latitude) * math.pi / 180.0;
+  final dLon = (b.longitude - a.longitude) * math.pi / 180.0;
+  final lat1 = a.latitude * math.pi / 180.0;
+  final lat2 = b.latitude * math.pi / 180.0;
+
+  final h =
+      math.sin(dLat / 2) * math.sin(dLat / 2) +
+      math.sin(dLon / 2) * math.sin(dLon / 2) * math.cos(lat1) * math.cos(lat2);
+  final c = 2 * math.atan2(math.sqrt(h), math.sqrt(1 - h));
+  return earthRadius * c;
+}
+
+final locationSyncProvider = Provider<void>((ref) {
+  ref.listen<AsyncValue<Position>>(locationTrackingProvider, (
+    previous,
+    next,
+  ) async {
+    final rider = await ref.read(currentRiderProvider.future);
+    if (rider == null) return;
+
+    next.whenData((position) async {
+      final movementState = ref.read(movementProvider);
+      final previousPos = movementState.current;
+      final moved = previousPos == null
+          ? 0.0
+          : _distanceMeters(previousPos, position);
+      final moving = moved >= 50.0;
+
+      ref.read(movementProvider.notifier).state = movementState.copyWith(
+        previous: previousPos,
+        current: position,
+        movedMeters: moved,
+        isMoving: moving,
+        lastUpdatedAt: DateTime.now(),
+      );
+
+      if (moving) {
+        final api = ref.read(apiServiceProvider);
+        await api.updateRiderLocation(
+          riderId: rider.id,
+          latitude: position.latitude,
+          longitude: position.longitude,
+        );
+      }
+    });
+  });
 });
 
 final zoneHeatmapProvider = FutureProvider<Map<String, dynamic>>((ref) async {

@@ -405,12 +405,12 @@ Respond with ONLY valid JSON, no other text."""
     def is_incident_trigger_active(
         self, 
         incidents: List[NewsIncident], 
-        threshold: int = None
+        threshold: Optional[int] = None
     ) -> bool:
         """
         Check if incident count exceeds trigger threshold.
         """
-        threshold = threshold or settings.ACCIDENT_THRESHOLD_COUNT
+        threshold = threshold or settings.ROAD_DISRUPTION_THRESHOLD_COUNT
         relevant_incidents = [i for i in incidents if i.is_trigger_relevant]
         return len(relevant_incidents) >= threshold
     

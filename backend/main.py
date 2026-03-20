@@ -77,7 +77,7 @@ app = FastAPI(
     
     - **Rain Triggers**: OpenWeatherMap API integration
     - **Traffic Triggers**: TomTom API for congestion data  
-    - **Incident Triggers**: NewsAPI for accident detection
+    - **Incident Triggers**: NewsAPI for road disruption detection
     - **Surge Triggers**: Platform demand monitoring
     
     ### Key Features:
@@ -158,7 +158,7 @@ async def get_api_config():
             "incidents": settings.INCIDENT_THRESHOLD
         },
         "poll_interval_seconds": settings.TRIGGER_POLL_INTERVAL,
-        "supported_triggers": ["rain", "traffic", "surge", "accident"],
+        "supported_triggers": ["rain", "traffic", "surge", "road_disruption"],
         "supported_personas": ["qcommerce", "food_delivery"]
     }
 

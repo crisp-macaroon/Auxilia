@@ -125,6 +125,18 @@ class ApiService {
     }, (json) => json as Map<String, dynamic>);
   }
 
+  Future<ApiResponse<Map<String, dynamic>>> updateRiderLocation({
+    required String riderId,
+    required double latitude,
+    required double longitude,
+  }) async {
+    return post(
+      '/riders/$riderId/update-location?latitude=$latitude&longitude=$longitude',
+      {'latitude': latitude, 'longitude': longitude},
+      (json) => json as Map<String, dynamic>,
+    );
+  }
+
   Future<ApiResponse<List<Zone>>> getZones() async {
     return get(
       '/zones/',
@@ -203,6 +215,20 @@ class ApiService {
           .map((claim) => Claim.fromJson(claim as Map<String, dynamic>))
           .toList(),
     );
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> runTriggerCheck() async {
+    return post('/triggers/check', {}, (json) => json as Map<String, dynamic>);
+  }
+
+  Future<ApiResponse<Claim>> createClaim({
+    required String policyId,
+    required String triggerType,
+  }) async {
+    return post('/claims/', {
+      'policy_id': policyId,
+      'trigger_type': triggerType,
+    }, (json) => Claim.fromJson(json as Map<String, dynamic>));
   }
 
   Future<ApiResponse<Map<String, dynamic>>> getClaimsSummary(
