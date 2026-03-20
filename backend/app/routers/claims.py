@@ -27,7 +27,7 @@ TRIGGER_THRESHOLDS = {
     TriggerType.RAIN: settings.RAIN_THRESHOLD_MM,
     TriggerType.TRAFFIC: settings.CONGESTION_THRESHOLD,
     TriggerType.SURGE: settings.SURGE_THRESHOLD,
-    TriggerType.ACCIDENT: settings.INCIDENT_THRESHOLD
+    TriggerType.ROAD_DISRUPTION: settings.INCIDENT_THRESHOLD
 }
 
 
