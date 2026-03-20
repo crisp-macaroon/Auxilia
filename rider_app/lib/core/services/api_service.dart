@@ -177,6 +177,25 @@ class ApiService {
     }, (json) => Policy.fromJson(json as Map<String, dynamic>));
   }
 
+  Future<ApiResponse<Map<String, dynamic>>> renewPolicy({
+    required String policyId,
+    int durationWeeks = 1,
+  }) async {
+    return post('/policies/$policyId/renew', {
+      'duration_days': durationWeeks * 7,
+    }, (json) => json as Map<String, dynamic>);
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> upgradePolicy({
+    required String policyId,
+    required int additionalWeeks,
+  }) async {
+    // Upgrade is same as renew with more weeks
+    return post('/policies/$policyId/renew', {
+      'duration_days': additionalWeeks * 7,
+    }, (json) => json as Map<String, dynamic>);
+  }
+
   Future<ApiResponse<List<Claim>>> getRiderClaims(String riderId) async {
     return get(
       '/claims/?rider_id=$riderId',
@@ -245,6 +264,42 @@ class ApiService {
     return get(
       '/dashboard/zone-heatmap$query',
       (json) => json as Map<String, dynamic>,
+    );
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> getZoneNews(String zoneId) async {
+    return get(
+      '/triggers/news/$zoneId',
+      (json) => json as Map<String, dynamic>,
+    );
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> getZoneTraffic(
+    String zoneId,
+  ) async {
+    return get(
+      '/triggers/traffic/$zoneId',
+      (json) => json as Map<String, dynamic>,
+    );
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> getZoneSurge(String zoneId) async {
+    return get(
+      '/triggers/surge/$zoneId',
+      (json) => json as Map<String, dynamic>,
+    );
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> getSystemAlerts() async {
+    return get('/dashboard/alerts', (json) => json as Map<String, dynamic>);
+  }
+
+  Future<ApiResponse<List<Claim>>> getRiderClaimHistory(String riderId) async {
+    return get(
+      '/claims/?rider_id=$riderId&limit=50',
+      (json) => (json as List)
+          .map((claim) => Claim.fromJson(claim as Map<String, dynamic>))
+          .toList(),
     );
   }
 

@@ -180,13 +180,13 @@ class DashboardScreen extends ConsumerWidget {
   }
 }
 
-class _LocationStatusCard extends StatelessWidget {
+class _LocationStatusCard extends ConsumerWidget {
   final AsyncValue<Position> locationAsync;
 
   const _LocationStatusCard({required this.locationAsync});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -221,19 +221,40 @@ class _LocationStatusCard extends StatelessWidget {
             ),
           ],
         ),
-        error: (_, _) => Row(
-          children: [
-            const Icon(Icons.location_off_rounded, color: AppColors.warning),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Location tracking disabled. Enable GPS for delivery-zone insurance checks.',
-                style: AppTypography.bodySmall.copyWith(
-                  color: AppColors.textSecondary,
+        error: (error, _) => InkWell(
+          onTap: () async {
+            // Open settings and then refresh
+            await Geolocator.openAppSettings();
+            ref.invalidate(locationTrackingProvider);
+          },
+          child: Row(
+            children: [
+              const Icon(Icons.location_off_rounded, color: AppColors.warning),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Location permission required',
+                      style: AppTypography.bodySmall.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Tap to open settings and enable location access',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ],
+              const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+            ],
+          ),
         ),
       ),
     );
@@ -375,6 +396,14 @@ class _HeatmapCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final points = (data['points'] as List<dynamic>? ?? []);
+
+    // Group by city for better display
+    final Map<String, List<dynamic>> byCity = {};
+    for (var point in points.take(12)) {
+      final city = point['city'] as String? ?? 'Unknown';
+      byCity.putIfAbsent(city, () => []).add(point);
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -385,48 +414,131 @@ class _HeatmapCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Zone Heatmap Snapshot', style: AppTypography.titleSmall),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: points.take(8).map((point) {
-              final score = (point['heat_score'] as num?)?.toDouble() ?? 0.0;
-              final color = score >= 0.75
-                  ? AppColors.danger
-                  : score >= 0.5
-                  ? AppColors.warning
-                  : score >= 0.25
-                  ? AppColors.success
-                  : AppColors.primary;
-              return Container(
-                width: 150,
-                padding: const EdgeInsets.all(10),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: color.withOpacity(0.3)),
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${point['zone_name']}',
-                      style: AppTypography.labelMedium,
-                    ),
-                    Text(
-                      'Heat ${(score * 100).toStringAsFixed(0)}%',
-                      style: AppTypography.bodySmall.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
+                child: const Icon(
+                  Icons.map_rounded,
+                  color: AppColors.primary,
+                  size: 20,
                 ),
-              );
-            }).toList(),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Zone Risk Heatmap', style: AppTypography.titleSmall),
+                  Text(
+                    '${points.length} zones monitored',
+                    style: AppTypography.bodySmall.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
+          const SizedBox(height: 16),
+          // Risk legend
+          Row(
+            children: [
+              _legendDot(AppColors.success, 'Low'),
+              const SizedBox(width: 12),
+              _legendDot(AppColors.warning, 'Medium'),
+              const SizedBox(width: 12),
+              _legendDot(AppColors.danger, 'High'),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Zone grid
+          ...byCity.entries
+              .take(3)
+              .map(
+                (entry) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        entry.key,
+                        style: AppTypography.labelMedium.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: entry.value.take(4).map((point) {
+                          final score =
+                              (point['heat_score'] as num?)?.toDouble() ?? 0.0;
+                          final color = score >= 0.7
+                              ? AppColors.danger
+                              : score >= 0.4
+                              ? AppColors.warning
+                              : AppColors.success;
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: color.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: color.withOpacity(0.3)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: color,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '${point['zone_name']}',
+                                  style: AppTypography.labelSmall,
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
         ],
       ),
+    );
+  }
+
+  Widget _legendDot(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: AppTypography.labelSmall.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -472,7 +584,8 @@ class _ShieldCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final progress = daysLeft <= 0 ? 0.0 : (daysLeft.clamp(0, 30) / 30);
+    // Weekly model: 7 days max
+    final progress = daysLeft <= 0 ? 0.0 : (daysLeft.clamp(0, 7) / 7);
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -490,34 +603,44 @@ class _ShieldCard extends StatelessWidget {
       child: Column(
         children: [
           SizedBox(
-            width: 120,
-            height: 120,
+            width: 140,
+            height: 140,
             child: Stack(
               alignment: Alignment.center,
               children: [
-                CircularProgressIndicator(
-                  value: progress,
-                  strokeWidth: 8,
-                  backgroundColor: AppColors.white.withOpacity(0.2),
-                  valueColor: const AlwaysStoppedAnimation(AppColors.white),
+                SizedBox(
+                  width: 140,
+                  height: 140,
+                  child: CircularProgressIndicator(
+                    value: progress,
+                    strokeWidth: 10,
+                    backgroundColor: AppColors.white.withOpacity(0.2),
+                    valueColor: const AlwaysStoppedAnimation(AppColors.white),
+                  ),
                 ),
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      '$daysLeft',
-                      style: AppTypography.displayLarge.copyWith(
-                        color: AppColors.white,
-                        fontWeight: FontWeight.w800,
+                Container(
+                  width: 100,
+                  height: 100,
+                  alignment: Alignment.center,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        '$daysLeft',
+                        style: AppTypography.displayLarge.copyWith(
+                          color: AppColors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 42,
+                        ),
                       ),
-                    ),
-                    Text(
-                      'days left',
-                      style: AppTypography.labelSmall.copyWith(
-                        color: AppColors.white.withOpacity(0.84),
+                      Text(
+                        'days left',
+                        style: AppTypography.labelSmall.copyWith(
+                          color: AppColors.white.withOpacity(0.84),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),

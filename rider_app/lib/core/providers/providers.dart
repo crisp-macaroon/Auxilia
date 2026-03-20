@@ -234,22 +234,47 @@ final backendConnectedProvider = FutureProvider<bool>((ref) async {
 });
 
 final locationTrackingProvider = StreamProvider<Position>((ref) async* {
+  // First check if location service is enabled
   final enabled = await Geolocator.isLocationServiceEnabled();
-  if (!enabled) return;
+  if (!enabled) {
+    // Try to open location settings
+    await Geolocator.openLocationSettings();
+    // Re-check after user interaction
+    final stillDisabled = !await Geolocator.isLocationServiceEnabled();
+    if (stillDisabled) {
+      throw Exception('Location services are disabled. Please enable GPS.');
+    }
+  }
 
+  // Request permission
   var permission = await Geolocator.checkPermission();
   if (permission == LocationPermission.denied) {
     permission = await Geolocator.requestPermission();
   }
-  if (permission == LocationPermission.deniedForever ||
-      permission == LocationPermission.denied) {
-    return;
+
+  if (permission == LocationPermission.deniedForever) {
+    // Open app settings so user can enable permission
+    await Geolocator.openAppSettings();
+    throw Exception(
+      'Location permission permanently denied. Please enable in Settings.',
+    );
   }
 
+  if (permission == LocationPermission.denied) {
+    throw Exception('Location permission denied. Tap to enable.');
+  }
+
+  // Get initial position first
+  final initialPosition = await Geolocator.getCurrentPosition(
+    desiredAccuracy: LocationAccuracy.high,
+  );
+  yield initialPosition;
+
+  // Then stream updates
   yield* Geolocator.getPositionStream(
     locationSettings: const LocationSettings(
       accuracy: LocationAccuracy.high,
-      distanceFilter: 100,
+      distanceFilter: 50,
     ),
   );
 });
@@ -266,4 +291,56 @@ final zoneHeatmapProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   final response = await api.getZoneHeatmap();
   if (response.success && response.data != null) return response.data!;
   return {'points': [], 'count': 0};
+});
+
+/// Zone news provider - Gemini-powered incident analysis
+final zoneNewsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final policy = await ref.watch(activePolicyProvider.future);
+  if (policy == null) return {'incidents': [], 'incident_count': 0};
+
+  final api = ref.watch(apiServiceProvider);
+  final response = await api.getZoneNews(policy.zoneId);
+  if (response.success && response.data != null) return response.data!;
+  return {'incidents': [], 'incident_count': 0};
+});
+
+/// Zone traffic provider
+final zoneTrafficProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final policy = await ref.watch(activePolicyProvider.future);
+  if (policy == null) return {};
+
+  final api = ref.watch(apiServiceProvider);
+  final response = await api.getZoneTraffic(policy.zoneId);
+  if (response.success && response.data != null) return response.data!;
+  return {};
+});
+
+/// Zone surge provider
+final zoneSurgeProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final policy = await ref.watch(activePolicyProvider.future);
+  if (policy == null) return {};
+
+  final api = ref.watch(apiServiceProvider);
+  final response = await api.getZoneSurge(policy.zoneId);
+  if (response.success && response.data != null) return response.data!;
+  return {};
+});
+
+/// System alerts provider
+final systemAlertsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final api = ref.watch(apiServiceProvider);
+  final response = await api.getSystemAlerts();
+  if (response.success && response.data != null) return response.data!;
+  return {'alerts': [], 'count': 0};
+});
+
+/// Claim history provider
+final claimHistoryProvider = FutureProvider<List<Claim>>((ref) async {
+  final riderId = await ref.watch(currentRiderIdProvider.future);
+  if (riderId == null) return [];
+
+  final api = ref.watch(apiServiceProvider);
+  final response = await api.getRiderClaimHistory(riderId);
+  if (response.success && response.data != null) return response.data!;
+  return [];
 });
