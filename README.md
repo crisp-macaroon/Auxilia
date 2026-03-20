@@ -139,4 +139,4 @@ From `rider_app/`:
 
 This is a live hackathon build. Things move fast. As of now all the basic UI and backend architecture are done, at present working on making the fraud detection and better zone based method improvement.
 
-Demo video: [watch here](#)
+Demo video: [watch here](https://youtu.be/o00wG1vSz_Q)
