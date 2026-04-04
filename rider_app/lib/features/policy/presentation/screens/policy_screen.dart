@@ -870,7 +870,6 @@ class _NewsItem extends StatelessWidget {
       case 'strike':
         categoryIcon = Icons.groups_rounded;
         break;
-      case 'accident':
       case 'road_disruption':
         categoryIcon = Icons.warning_rounded;
         break;

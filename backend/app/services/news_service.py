@@ -1,7 +1,7 @@
 """
-News API Service with Gemini AI Analysis
-Fetches news for accident/incident detection in zones
-Uses Gemini AI to intelligently analyze headlines and extract relevant incidents
+News API Service with Gemini AI Analysis.
+Fetches delivery-impacting road disruption and incident signals in zones.
+Uses Gemini AI to analyze headlines and extract relevant disruption events.
 """
 import httpx
 import google.generativeai as genai
@@ -124,7 +124,7 @@ class NewsService:
             url = f"{NEWS_API_BASE_URL}/everything"
             
             # Broad search query - let Gemini do the filtering
-            query = f'{city} (traffic OR accident OR road OR weather OR flood OR incident)'
+            query = f'{city} (traffic OR road closure OR road block OR flood OR weather OR incident OR disruption)'
             
             from_date = (datetime.utcnow() - timedelta(hours=hours_back)).strftime("%Y-%m-%dT%H:%M:%S")
             
@@ -190,28 +190,29 @@ class NewsService:
             
             articles_combined = "\n\n".join(articles_text)
             
-            prompt = f"""Analyze these news headlines from {city}, India and identify ONLY articles that are about ACTUAL traffic/road incidents that would affect delivery riders and gig workers.
+            prompt = f"""Analyze these news headlines from {city}, India and identify ONLY articles that are about ACTUAL traffic or road disruptions that would affect delivery riders and gig workers.
 
 INCLUDE articles about:
-- Road accidents (vehicle crashes, collisions, hit-and-run)
+- Road disruptions (collisions, crashes, closures, diversions, blocked corridors)
 - Traffic disruptions (road blocks, diversions, heavy congestion due to specific events)
 - Weather impacts on roads (flooding, waterlogging, storm damage)
-- Infrastructure issues (potholes causing accidents, road cave-ins, bridge issues)
+- Infrastructure issues (unsafe potholes, road cave-ins, bridge issues)
 - Safety incidents on roads (robbery on highways, unsafe areas for riders)
+- Curfews, local shutdowns, or strike-linked access issues affecting deliveries
 
 EXCLUDE articles about:
-- Stock market crashes, economic accidents, political events
+- Stock market crashes, economic events, political speeches without delivery impact
 - Sports news, entertainment news
 - General weather forecasts without road impact
 - Crime not related to roads/delivery workers
-- Accidents in other countries/cities
+- Incidents in other countries/cities
 
 For each RELEVANT incident, provide a JSON response in this exact format:
 {{
   "incidents": [
     {{
       "article_index": 1,
-      "incident_type": "accident|weather|traffic|infrastructure|safety",
+      "incident_type": "road_disruption|weather|traffic|infrastructure|safety",
       "severity": 0.1 to 1.0,
       "location": "specific area/road name if mentioned, otherwise '{city}'",
       "summary": "brief 1-line summary",
@@ -263,7 +264,7 @@ Respond with ONLY valid JSON, no other text."""
                     source=article.get("source", {}).get("name", ""),
                     url=article.get("url", ""),
                     published_at=self._parse_date(article.get("publishedAt")),
-                    incident_type=item.get("incident_type", "accident"),
+                    incident_type=item.get("incident_type", "road_disruption"),
                     severity=float(item.get("severity", 0.5)),
                     location=item.get("location", city),
                     city=city,
@@ -340,7 +341,7 @@ Respond with ONLY valid JSON, no other text."""
             
             # Categorize incidents
             categorized = {
-                "accidents": 0,
+                "road_disruption": 0,
                 "weather": 0,
                 "traffic": 0,
                 "infrastructure": 0,
@@ -355,7 +356,7 @@ Respond with ONLY valid JSON, no other text."""
                 if incident_type in categorized:
                     categorized[incident_type] += 1
                 elif incident_type == "accident":
-                    categorized["accidents"] += 1
+                    categorized["road_disruption"] += 1
                 
                 categorized["articles"].append({
                     "title": incident.title,
@@ -371,7 +372,7 @@ Respond with ONLY valid JSON, no other text."""
             return categorized
         except Exception as e:
             logger.error(f"Zone incidents error: {e}")
-            return {"accidents": 0, "weather": 0, "traffic": 0, "total": 0, "articles": [], "ai_analyzed": False}
+            return {"road_disruption": 0, "weather": 0, "traffic": 0, "total": 0, "articles": [], "ai_analyzed": False}
     
     async def get_real_time_alerts(self, city: str) -> List[Dict[str, Any]]:
         """

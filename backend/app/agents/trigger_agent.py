@@ -39,7 +39,7 @@ class TriggerAgent:
     Triggers monitored:
     - Rain: OpenWeatherMap API (>15mm/hour)
     - Traffic: TomTom API (congestion level >7)
-    - Incidents: NewsAPI (accidents/disruptions in zone)
+    - Incidents: NewsAPI (road disruptions and delivery-impacting incidents in zone)
     - Surge: Platform surge data (multiplier <0.8 = low demand)
     """
     

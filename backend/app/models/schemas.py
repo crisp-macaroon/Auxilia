@@ -28,7 +28,7 @@ class TriggerType(str, Enum):
     RAIN = "rain"
     TRAFFIC = "traffic"
     SURGE = "surge"
-    ROAD_DISRUPTION = "road_disruption"  # Renamed from 'accident' - covers road incidents affecting income
+    ROAD_DISRUPTION = "road_disruption"
 
 
 class RiderStatus(str, Enum):
@@ -330,7 +330,7 @@ class NewsIncident(BaseModel):
     source: str
     url: str
     published_at: datetime
-    incident_type: str  # accident, weather, traffic, infrastructure, safety
+    incident_type: str  # road_disruption, weather, traffic, infrastructure, safety
     severity: float  # 0.0 to 1.0
     location: str
     city: str

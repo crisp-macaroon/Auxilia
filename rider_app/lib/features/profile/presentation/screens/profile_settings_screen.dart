@@ -942,7 +942,7 @@ class _HelpSupportSheet extends StatelessWidget {
                 _FAQItem(
                   question: 'What triggers a claim?',
                   answer:
-                      'Claims are triggered by: Heavy rain/flooding, Traffic surges above 80%, Road closures or accidents in your zone, and other verified disruptions that impact gig worker earnings.',
+                      'Claims are triggered by: Heavy rain or flooding, severe traffic congestion, road closures, and other verified delivery disruptions that impact gig worker earnings.',
                 ),
                 _FAQItem(
                   question: 'How much coverage do I get?',

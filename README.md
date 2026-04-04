@@ -6,6 +6,8 @@ Live website: `https://auxilia.sabarixr.me`
 
 Primary focus: high-pressure Q-commerce and food-delivery riders, where 10-minute delivery promises, dense urban routing, and disruption-sensitive earnings create very different risk profiles.
 
+Coverage scope is strict: Auxilia covers loss of income only. It does not cover health, life, accidents as injury insurance, or vehicle repair costs.
+
 ## Project Overview
 
 This repo contains three connected applications:
@@ -20,7 +22,7 @@ This repo contains three connected applications:
 
 - rider onboarding with persona selection and profile setup
 - rider login with phone number and password
-- weekly policy purchase and renewal
+- weekly policy purchase and renewal aligned to gig-worker earning cycles
 - Razorpay checkout integration
 - live policy, claims, and trigger visibility
 - delivery check-in support
@@ -55,6 +57,8 @@ This repo contains three connected applications:
 3. The backend tracks live disruption signals and rider delivery context.
 4. Risk is calculated using location, trigger data, incidents, and delivery path context.
 5. Claims and operational activity become visible in both the rider app and admin dashboard.
+
+All claim logic is tied to verified external disruptions that reduce earning ability. The system does not pay for medical treatment, accident injury, or vehicle repair.
 
 ## Risk Lens
 

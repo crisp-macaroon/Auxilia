@@ -29,7 +29,7 @@ class TriggerType(str, enum.Enum):
     RAIN = "rain"
     TRAFFIC = "traffic"
     SURGE = "surge"
-    ROAD_DISRUPTION = "road_disruption"  # Renamed from 'accident' - road incidents affecting income
+    ROAD_DISRUPTION = "road_disruption"
 
 
 class RiderStatus(str, enum.Enum):
