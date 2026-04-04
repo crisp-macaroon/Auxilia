@@ -6,6 +6,8 @@ import {
   TrendingUp,
   AlertTriangle,
 } from 'lucide-react';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 
 import { StatCard, ClaimsChart, LiveTriggers, RecentClaims, ZoneDistribution, ZoneHeatmap, ZoneMap } from '@/components/dashboard';
 import {
@@ -16,9 +18,17 @@ import {
   getZoneHeatmap,
   getZoneStats,
 } from '@/lib/api';
+import { ADMIN_TOKEN_COOKIE, hasAdminToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/utils';
 
 export default async function DashboardPage() {
+  const cookieStore = await cookies();
+  const adminToken = cookieStore.get(ADMIN_TOKEN_COOKIE)?.value;
+
+  if (!hasAdminToken(adminToken)) {
+    redirect('/login');
+  }
+
   const [stats, claimsChart, recentClaims, liveTriggers, zoneStats, zoneHeatmap] = await Promise.all([
     getDashboardStats(),
     getClaimsChart(),

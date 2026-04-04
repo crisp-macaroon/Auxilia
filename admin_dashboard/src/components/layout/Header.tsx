@@ -9,8 +9,17 @@ export function Header() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<{id: string, message: string, time: string, type: string}[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [currentDateLabel, setCurrentDateLabel] = useState('');
 
   useEffect(() => {
+    setCurrentDateLabel(
+      new Date().toLocaleDateString('en-IN', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+      })
+    );
+
     async function loadNotifications() {
       try {
         const [triggersRes, claimsRes, pricingRes] = await Promise.all([
@@ -76,12 +85,6 @@ export function Header() {
 
       {/* Right Actions */}
       <div className="flex items-center gap-4">
-        {/* Live Status */}
-        <div className="flex items-center gap-2 rounded-full bg-green-50 px-4 py-2">
-          <span className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
-          <span className="text-sm font-medium text-green-700">System Live</span>
-        </div>
-
         {/* Notifications */}
         <div className="relative">
           <button
@@ -123,13 +126,7 @@ export function Header() {
 
         {/* Date/Time */}
         <div className="flex items-center gap-2 text-sm text-slate-600">
-          <span className="font-medium">
-            {new Date().toLocaleDateString('en-IN', {
-              weekday: 'short',
-              day: 'numeric',
-              month: 'short',
-            })}
-          </span>
+          <span className="font-medium">{currentDateLabel || 'Auxilia Admin'}</span>
           <ChevronDown className="h-4 w-4" />
         </div>
       </div>
