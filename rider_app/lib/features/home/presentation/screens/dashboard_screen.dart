@@ -15,6 +15,7 @@ class DashboardScreen extends ConsumerWidget {
     ref.watch(locationSyncProvider);
     final riderAsync = ref.watch(currentRiderProvider);
     final policyAsync = ref.watch(activePolicyProvider);
+    final latestPolicyAsync = ref.watch(latestPolicyProvider);
     final claimsSummaryAsync = ref.watch(claimsSummaryProvider);
     final triggersAsync = ref.watch(triggersProvider);
     final locationAsync = ref.watch(locationTrackingProvider);
@@ -28,6 +29,7 @@ class DashboardScreen extends ConsumerWidget {
           onRefresh: () async {
             ref.invalidate(currentRiderProvider);
             ref.invalidate(activePolicyProvider);
+            ref.invalidate(latestPolicyProvider);
             ref.invalidate(claimsSummaryProvider);
             ref.invalidate(triggersProvider);
           },
@@ -75,8 +77,25 @@ class DashboardScreen extends ConsumerWidget {
               _DeliveryCheckInCard(),
               const SizedBox(height: 24),
               policyAsync.when(
-                data: (policy) =>
-                    _ShieldCard(daysLeft: policy?.daysRemaining ?? 0),
+                data: (policy) {
+                  if (policy != null) {
+                    return _ShieldCard(daysLeft: policy.daysRemaining);
+                  }
+
+                  final rider = riderAsync.valueOrNull;
+                  final latestPolicy = latestPolicyAsync.valueOrNull;
+                  if (rider != null && latestPolicy != null) {
+                    return const _EmptyCard(
+                      title: 'Policy expired',
+                      subtitle: 'You are onboarded. Renew coverage from the Policy tab.',
+                    );
+                  }
+
+                  return const _EmptyCard(
+                    title: 'No active policy yet',
+                    subtitle: 'Finish onboarding to activate your coverage.',
+                  );
+                },
                 loading: () => const _CardSkeleton(height: 220),
                 error: (_, _) => const _EmptyCard(
                   title: 'No active policy yet',
@@ -98,13 +117,13 @@ class DashboardScreen extends ConsumerWidget {
                   Expanded(
                     child: claimsSummaryAsync.when(
                       data: (summary) => _MetricCard(
-                        title: 'Paid Claims',
-                        value: '${summary['paid'] ?? 0}',
+                        title: 'Settled Claims',
+                        value: '${summary['settled'] ?? summary['paid'] ?? 0}',
                         accent: AppColors.success,
                       ),
                       loading: () => const _CardSkeleton(height: 110),
                       error: (_, _) => const _MetricCard(
-                        title: 'Paid Claims',
+                        title: 'Settled Claims',
                         value: '0',
                         accent: AppColors.success,
                       ),

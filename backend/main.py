@@ -20,7 +20,9 @@ from app.routers import (
     triggers_router,
     zones_router,
     dashboard_router,
-    weather_router
+    weather_router,
+    payments_router,
+    auth_router,
 )
 from app.agents.trigger_agent import trigger_agent
 
@@ -116,6 +118,8 @@ app.include_router(triggers_router, prefix="/api/v1")
 app.include_router(zones_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
 app.include_router(weather_router, prefix="/api/v1")
+app.include_router(payments_router, prefix="/api/v1")
+app.include_router(auth_router, prefix="/api/v1")
 
 
 @app.get("/")

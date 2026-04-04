@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/providers/providers.dart';
+import '../../../../core/services/api_service.dart';
 import '../../../../core/services/notification_service.dart';
 import '../../../../core/theme/theme.dart';
+import '../../../../shared/models/models.dart';
 
 // Provider for notification enabled state
 final notificationsEnabledProvider = StateProvider<bool>((ref) => true);
@@ -256,14 +258,29 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
                   );
 
                   final triggerRes = await api.runTriggerCheck();
-                  final claimRes = await api.createClaim(
-                    policyId: policy.id,
-                    triggerType: 'road_disruption',
-                  );
+                  final zoneTriggers = await api.getZoneTriggers(policy.zoneId);
+
+                  ApiResponse<Claim>? claimRes;
+                  TriggerStatusModel? activeTrigger;
+                  final triggers = zoneTriggers.data ?? <TriggerStatusModel>[];
+                  for (final trigger in triggers) {
+                    if (trigger.isActive) {
+                      activeTrigger = trigger;
+                      break;
+                    }
+                  }
+
+                  if (activeTrigger != null) {
+                    claimRes = await api.createClaim(
+                      policyId: policy.id,
+                      triggerType: activeTrigger.triggerType,
+                    );
+                  }
 
                   if (context.mounted) {
-                    final msg =
-                        'Workflow done | Location: ${locationRes.success} | Check-in: ${checkInRes.success} | Trigger scan: ${triggerRes.success} | Claim: ${claimRes.success}';
+                    final msg = activeTrigger == null
+                        ? 'Workflow done | Location: ${locationRes.success} | Check-in: ${checkInRes.success} | Trigger scan: ${triggerRes.success} | Claim skipped: no active trigger'
+                        : 'Workflow done | Location: ${locationRes.success} | Check-in: ${checkInRes.success} | Trigger scan: ${triggerRes.success} | Claim: ${claimRes?.success ?? false} (${activeTrigger.triggerType})';
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(msg),
@@ -276,6 +293,7 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
                   ref.invalidate(triggersProvider);
                   ref.invalidate(claimsProvider);
                   ref.invalidate(claimsSummaryProvider);
+                  ref.invalidate(latestPolicyProvider);
                 },
               ).animate(delay: 400.ms).fadeIn(),
 

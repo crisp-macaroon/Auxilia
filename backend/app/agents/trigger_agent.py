@@ -94,11 +94,11 @@ class TriggerAgent:
             "zone_name": zone["name"],
             "city": city,
             "triggers": triggers,
-            "active_count": len(triggers),
+            "active_count": len([trigger for trigger in triggers if trigger.is_active]),
             "checked_at": datetime.utcnow().isoformat()
         }
-        
-        self._active_triggers[zone_id] = triggers
+
+        self._active_triggers[zone_id] = [trigger for trigger in triggers if trigger.is_active]
         
         return self._signals[zone_id]
     

@@ -176,6 +176,20 @@ class ApiService {
     return ApiResponse.success(activePolicies.first);
   }
 
+  Future<ApiResponse<Policy>> getLatestPolicy(String riderId) async {
+    final response = await getRiderPolicies(riderId);
+    if (!response.success || response.data == null) {
+      return ApiResponse.failure(response.error ?? 'Failed to load policies');
+    }
+
+    final policies = response.data!..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    if (policies.isEmpty) {
+      return ApiResponse.failure('No policy found');
+    }
+
+    return ApiResponse.success(policies.first);
+  }
+
   Future<ApiResponse<Policy>> createPolicy({
     required String riderId,
     required String zoneId,
@@ -193,9 +207,11 @@ class ApiService {
     required String policyId,
     int durationWeeks = 1,
   }) async {
-    return post('/policies/$policyId/renew', {
-      'duration_days': durationWeeks * 7,
-    }, (json) => json as Map<String, dynamic>);
+    return post(
+      '/policies/$policyId/renew?duration_days=${durationWeeks * 7}',
+      {},
+      (json) => json as Map<String, dynamic>,
+    );
   }
 
   Future<ApiResponse<Map<String, dynamic>>> upgradePolicy({
@@ -240,15 +256,59 @@ class ApiService {
     }
 
     final claims = response.data!;
-    final paidClaims = claims.where((claim) => claim.isPaid).toList();
     final approvedClaims = claims.where((claim) => claim.isApproved).toList();
+    final paidClaims = claims.where((claim) => claim.isPaid).toList();
+    final protectedClaims = approvedClaims.isNotEmpty ? approvedClaims : paidClaims;
 
     return ApiResponse.success({
       'total': claims.length,
       'approved': approvedClaims.length,
       'paid': paidClaims.length,
-      'amount': paidClaims.fold<double>(0, (sum, claim) => sum + claim.amount),
+      'settled': approvedClaims.length,
+      'amount': protectedClaims.fold<double>(0, (sum, claim) => sum + claim.amount),
     });
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> createPolicyPaymentOrder({
+    required String flowType,
+    String? riderId,
+    String? zoneId,
+    String? persona,
+    int durationDays = 7,
+    String? existingPolicyId,
+  }) async {
+    return post('/payments/policy-order', {
+      'flow_type': flowType,
+      'rider_id': riderId,
+      'zone_id': zoneId,
+      'persona': persona,
+      'duration_days': durationDays,
+      'existing_policy_id': existingPolicyId,
+    }, (json) => json as Map<String, dynamic>);
+  }
+
+  Future<ApiResponse<Policy>> confirmPolicyPayment({
+    required String flowType,
+    required String orderId,
+    required String paymentId,
+    String? signature,
+    String? riderId,
+    String? zoneId,
+    String? persona,
+    int durationDays = 7,
+    String? existingPolicyId,
+  }) async {
+    return post('/payments/policy-confirm', {
+      'flow_type': flowType,
+      'order_id': orderId,
+      'payment_id': paymentId,
+      'signature': signature,
+      'rider_id': riderId,
+      'zone_id': zoneId,
+      'persona': persona,
+      'duration_days': durationDays,
+      'existing_policy_id': existingPolicyId,
+    }, (json) => Policy.fromJson(json as Map<String, dynamic>));
   }
 
   Future<ApiResponse<WeatherData>> getZoneWeather(

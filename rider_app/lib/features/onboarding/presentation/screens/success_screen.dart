@@ -111,7 +111,7 @@ class SuccessScreen extends ConsumerWidget {
                           Expanded(
                             child: _buildDetailItem(
                               'Premium',
-                              'Rs ${(policy?.premium ?? 0).toStringAsFixed(0)} / month',
+                              'Rs ${(policy?.premium ?? 0).toStringAsFixed(0)} / week',
                             ),
                           ),
                         ],

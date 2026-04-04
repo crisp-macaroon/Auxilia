@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 import '../../../../core/providers/providers.dart';
 import '../../../../core/theme/theme.dart';
@@ -17,6 +18,24 @@ class ReviewScreen extends ConsumerStatefulWidget {
 
 class _ReviewScreenState extends ConsumerState<ReviewScreen> {
   bool _isProcessing = false;
+  late final Razorpay _razorpay;
+  Map<String, dynamic>? _pendingOrder;
+  String? _pendingRiderId;
+
+  @override
+  void initState() {
+    super.initState();
+    _razorpay = Razorpay();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+  }
+
+  @override
+  void dispose() {
+    _razorpay.clear();
+    super.dispose();
+  }
 
   void _processPayment() async {
     setState(() => _isProcessing = true);
@@ -34,27 +53,123 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
       return;
     }
 
-    final policyResponse = await api.createPolicy(
+    _pendingRiderId = riderResponse.data!.id;
+
+    final orderResponse = await api.createPolicyPaymentOrder(
+      flowType: 'new_policy',
       riderId: riderResponse.data!.id,
       zoneId: onboarding.zoneId!,
       persona: onboarding.persona!,
+      durationDays: 7,
+    );
+
+    if (!mounted) return;
+
+    if (!orderResponse.success || orderResponse.data == null) {
+      setState(() => _isProcessing = false);
+      _showError(orderResponse.error ?? 'Failed to start payment');
+      return;
+    }
+
+    _pendingOrder = orderResponse.data;
+
+    if ((orderResponse.data!['checkout_mode'] ?? 'sandbox') == 'sandbox') {
+      await _confirmPolicyPayment(
+        orderId: orderResponse.data!['order_id'] as String,
+        paymentId: 'sandbox_payment_${DateTime.now().millisecondsSinceEpoch}',
+        signature: 'sandbox_signature',
+      );
+      return;
+    }
+
+    _razorpay.open({
+      'key': orderResponse.data!['key_id'],
+      'amount': orderResponse.data!['amount'],
+      'name': 'Auxilia',
+      'description': 'Weekly rider protection plan',
+      'order_id': orderResponse.data!['order_id'],
+      'prefill': orderResponse.data!['prefill'] ?? {},
+      'theme': {'color': '#F97316'},
+    });
+  }
+
+  Future<void> _confirmPolicyPayment({
+    required String orderId,
+    required String paymentId,
+    String? signature,
+  }) async {
+    final api = ref.read(apiServiceProvider);
+    final onboarding = ref.read(onboardingProvider);
+    final riderId = _pendingRiderId;
+
+    if (_pendingOrder == null || riderId == null) {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        _showError('Missing payment session. Please try again.');
+      }
+      return;
+    }
+
+    final policyResponse = await api.confirmPolicyPayment(
+      flowType: 'new_policy',
+      orderId: orderId,
+      paymentId: paymentId,
+      signature: signature,
+      riderId: riderId,
+      zoneId: onboarding.zoneId!,
+      persona: onboarding.persona!,
+      durationDays: 7,
     );
 
     if (!mounted) return;
 
     if (!policyResponse.success) {
       setState(() => _isProcessing = false);
-      _showError(policyResponse.error ?? 'Failed to create policy');
+      _showError(policyResponse.error ?? 'Payment verified but policy activation failed');
       return;
     }
 
     ref.invalidate(currentRiderProvider);
     ref.invalidate(activePolicyProvider);
+    ref.invalidate(latestPolicyProvider);
     ref.invalidate(claimsProvider);
     ref.invalidate(claimsSummaryProvider);
     ref.invalidate(triggersProvider);
+    ref.read(onboardingProvider.notifier).reset();
+
+    setState(() => _isProcessing = false);
 
     context.go(AppRoutes.success);
+  }
+
+  void _handlePaymentSuccess(PaymentSuccessResponse response) {
+    final fallbackOrderId = _pendingOrder?['order_id'] as String?;
+    final orderId = response.orderId ?? fallbackOrderId;
+    if (orderId == null) {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        _showError('Missing order ID from Razorpay');
+      }
+      return;
+    }
+
+    _confirmPolicyPayment(
+      orderId: orderId,
+      paymentId: response.paymentId ?? '',
+      signature: response.signature,
+    );
+  }
+
+  void _handlePaymentError(PaymentFailureResponse response) {
+    if (!mounted) return;
+    setState(() => _isProcessing = false);
+    _showError(response.message ?? 'Payment was cancelled');
+  }
+
+  void _handleExternalWallet(ExternalWalletResponse response) {
+    if (!mounted) return;
+    setState(() => _isProcessing = false);
+    _showError('${response.walletName ?? 'External wallet'} is not supported for this checkout');
   }
 
   void _showError(String message) {
@@ -224,7 +339,7 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              'Processing on blockchain...',
+                              'Opening Razorpay...',
                               style: AppTypography.buttonMedium.copyWith(
                                 color: AppColors.white,
                               ),

@@ -9,6 +9,8 @@ from app.routers.triggers import router as triggers_router
 from app.routers.zones import router as zones_router
 from app.routers.dashboard import router as dashboard_router
 from app.routers.weather import router as weather_router
+from app.routers.payments import router as payments_router
+from app.routers.auth import router as auth_router
 
 __all__ = [
     "riders_router",
@@ -18,4 +20,6 @@ __all__ = [
     "zones_router",
     "dashboard_router",
     "weather_router",
+    "payments_router",
+    "auth_router",
 ]

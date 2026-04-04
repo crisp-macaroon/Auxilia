@@ -20,6 +20,7 @@ from app.agents.risk_agent import risk_agent
 from app.services.location_service import location_service
 from app.models.database import Zone
 from app.core.config import settings
+from app.core.security import require_admin
 
 router = APIRouter(prefix="/riders", tags=["Riders"])
 
@@ -75,7 +76,8 @@ async def list_riders(
     status: Optional[RiderStatus] = None,
     zone_id: Optional[str] = None,
     persona: Optional[PersonaType] = None,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _admin: dict = Depends(require_admin),
 ):
     """List all riders with optional filters."""
     query = select(Rider)
@@ -404,7 +406,8 @@ async def delivery_checkin(
 
 @router.get("/stats/overview")
 async def get_rider_stats(
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _admin: dict = Depends(require_admin),
 ):
     """Get overall rider statistics."""
     total = await db.execute(select(func.count(Rider.id)))

@@ -62,6 +62,19 @@ final activePolicyProvider = FutureProvider<Policy?>((ref) async {
   return null;
 });
 
+final latestPolicyProvider = FutureProvider<Policy?>((ref) async {
+  final riderId = await ref.watch(currentRiderIdProvider.future);
+  if (riderId == null) return null;
+
+  final api = ref.watch(apiServiceProvider);
+  final response = await api.getLatestPolicy(riderId);
+
+  if (response.success && response.data != null) {
+    return response.data;
+  }
+  return null;
+});
+
 /// Claims list provider for current rider
 final claimsProvider = FutureProvider<List<Claim>>((ref) async {
   final riderId = await ref.watch(currentRiderIdProvider.future);

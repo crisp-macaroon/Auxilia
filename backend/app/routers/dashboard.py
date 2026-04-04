@@ -4,7 +4,7 @@ Endpoints for admin dashboard statistics and analytics
 """
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, case
+from sqlalchemy import select, func, case, or_
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -19,8 +19,9 @@ from app.models.schemas import (
     ZoneHeatPoint,
 )
 from app.agents.trigger_agent import trigger_agent, ZONE_CONFIG
+from app.core.security import require_admin
 
-router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
+router = APIRouter(prefix="/dashboard", tags=["Dashboard"], dependencies=[Depends(require_admin)])
 
 
 @router.get("/stats", response_model=DashboardStats)
@@ -31,7 +32,10 @@ async def get_dashboard_stats(
     # Policy stats
     total_policies = await db.execute(select(func.count(Policy.id)))
     active_policies = await db.execute(
-        select(func.count(Policy.id)).where(Policy.status == PolicyStatus.ACTIVE.value)
+        select(func.count(Policy.id)).where(
+            Policy.status == PolicyStatus.ACTIVE.value,
+            Policy.end_date > datetime.utcnow(),
+        )
     )
     
     # Claim stats
@@ -43,7 +47,12 @@ async def get_dashboard_stats(
     # Financial stats
     total_premium = await db.execute(select(func.sum(Policy.premium)))
     total_payouts = await db.execute(
-        select(func.sum(Claim.amount)).where(Claim.status == ClaimStatus.APPROVED.value)
+        select(func.sum(Claim.amount)).where(
+            or_(
+                Claim.status == ClaimStatus.APPROVED.value,
+                Claim.status == ClaimStatus.PAID.value,
+            )
+        )
     )
     
     # Rider stats
@@ -150,7 +159,8 @@ async def get_zone_statistics(
         policies = await db.execute(
             select(func.count(Policy.id)).where(
                 Policy.zone_id == zone_id,
-                Policy.status == PolicyStatus.ACTIVE.value
+                Policy.status == PolicyStatus.ACTIVE.value,
+                Policy.end_date > datetime.utcnow(),
             )
         )
         
@@ -260,18 +270,24 @@ async def get_revenue_metrics(
     
     # Claims paid
     payouts = await db.execute(
-        select(func.sum(Claim.amount)).where(
-            Claim.status == ClaimStatus.APPROVED.value,
-            Claim.processed_at >= cutoff
+            select(func.sum(Claim.amount)).where(
+                Claim.status.in_([
+                    ClaimStatus.APPROVED.value,
+                    ClaimStatus.PAID.value,
+                ]),
+                Claim.processed_at >= cutoff
+            )
         )
-    )
     
     # Average claim amount
     avg_claim = await db.execute(
-        select(func.avg(Claim.amount)).where(
-            Claim.status == ClaimStatus.APPROVED.value
+            select(func.avg(Claim.amount)).where(
+                Claim.status.in_([
+                    ClaimStatus.APPROVED.value,
+                    ClaimStatus.PAID.value,
+                ])
+            )
         )
-    )
     
     premium_val = premium.scalar() or 0
     payouts_val = payouts.scalar() or 0
@@ -390,6 +406,7 @@ async def get_zone_heatmap(
             select(func.count(Policy.id)).where(
                 Policy.zone_id == zone.id,
                 Policy.status == PolicyStatus.ACTIVE.value,
+                Policy.end_date > datetime.utcnow(),
             )
         )
         open_claims_q = await db.execute(

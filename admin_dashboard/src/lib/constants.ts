@@ -1,5 +1,7 @@
 // API Configuration
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://20.244.41.25/api/v1';
+export const SERVER_API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://20.244.41.25/api/v1';
+
+export const API_BASE_URL = typeof window === 'undefined' ? SERVER_API_BASE_URL : '/api/v1';
 
 // App Configuration
 export const APP_NAME = 'Auxilia Admin';

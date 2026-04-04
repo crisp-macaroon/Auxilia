@@ -4,7 +4,7 @@ Endpoints for insurance claims processing
 """
 from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from typing import List, Optional
 from datetime import datetime
 import uuid
@@ -19,6 +19,7 @@ from app.models.schemas import (
 from app.agents.trigger_agent import trigger_agent
 from app.agents.fraud_agent import fraud_agent
 from app.agents.payout_agent import payout_agent
+from app.core.security import get_optional_admin, require_admin
 
 router = APIRouter(prefix="/claims", tags=["Claims"])
 
@@ -211,7 +212,7 @@ async def process_claim_async(
             )
             
             if payout.approved:
-                claim.status = ClaimStatus.APPROVED.value
+                claim.status = ClaimStatus.PAID.value
                 claim.amount = payout.payout_amount
                 claim.tx_hash = payout.blockchain_tx_hash
                 claim.ai_decision = payout.decision_reason
@@ -239,9 +240,12 @@ async def list_claims(
     status: Optional[ClaimStatus] = None,
     rider_id: Optional[str] = None,
     trigger_type: Optional[TriggerType] = None,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    admin: Optional[dict] = Depends(get_optional_admin),
 ):
     """List all claims with optional filters."""
+    if rider_id is None and admin is None:
+        raise HTTPException(status_code=401, detail="Missing admin token")
     query = select(Claim)
     
     if status:
@@ -277,7 +281,8 @@ async def get_claim(
 @router.get("/{claim_id}/details")
 async def get_claim_details(
     claim_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _admin: dict = Depends(require_admin),
 ):
     """Get claim with full details including rider, policy, and zone."""
     result = await db.execute(
@@ -321,7 +326,8 @@ async def get_claim_details(
 @router.post("/{claim_id}/approve")
 async def approve_claim(
     claim_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _admin: dict = Depends(require_admin),
 ):
     """Manually approve a pending claim."""
     result = await db.execute(
@@ -348,7 +354,8 @@ async def approve_claim(
 async def reject_claim(
     claim_id: str,
     reason: str = "Claim rejected by administrator",
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _admin: dict = Depends(require_admin),
 ):
     """Manually reject a pending claim."""
     result = await db.execute(
@@ -373,7 +380,8 @@ async def reject_claim(
 
 @router.get("/stats/overview")
 async def get_claim_stats(
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _admin: dict = Depends(require_admin),
 ):
     """Get overall claim statistics."""
     total = await db.execute(select(func.count(Claim.id)))
@@ -383,11 +391,19 @@ async def get_claim_stats(
     approved = await db.execute(
         select(func.count(Claim.id)).where(Claim.status == ClaimStatus.APPROVED.value)
     )
+    paid = await db.execute(
+        select(func.count(Claim.id)).where(Claim.status == ClaimStatus.PAID.value)
+    )
     rejected = await db.execute(
         select(func.count(Claim.id)).where(Claim.status == ClaimStatus.REJECTED.value)
     )
     total_payout = await db.execute(
-        select(func.sum(Claim.amount)).where(Claim.status == ClaimStatus.APPROVED.value)
+        select(func.sum(Claim.amount)).where(
+            or_(
+                Claim.status == ClaimStatus.APPROVED.value,
+                Claim.status == ClaimStatus.PAID.value,
+            )
+        )
     )
     avg_fraud_score = await db.execute(select(func.avg(Claim.fraud_score)))
     
@@ -402,7 +418,7 @@ async def get_claim_stats(
     return {
         "total_claims": total.scalar() or 0,
         "pending_claims": pending.scalar() or 0,
-        "approved_claims": approved.scalar() or 0,
+        "approved_claims": (approved.scalar() or 0) + (paid.scalar() or 0),
         "rejected_claims": rejected.scalar() or 0,
         "total_payout": round(total_payout.scalar() or 0, 2),
         "average_fraud_score": round(avg_fraud_score.scalar() or 0, 3),

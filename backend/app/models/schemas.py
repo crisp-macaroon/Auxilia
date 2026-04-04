@@ -381,6 +381,49 @@ class PayoutDecision(BaseModel):
     decided_at: datetime
 
 
+class PaymentFlowType(str, Enum):
+    NEW_POLICY = "new_policy"
+    RENEW_POLICY = "renew_policy"
+
+
+class PolicyPaymentOrderRequest(BaseModel):
+    flow_type: PaymentFlowType = PaymentFlowType.NEW_POLICY
+    rider_id: Optional[str] = None
+    zone_id: Optional[str] = None
+    persona: Optional[PersonaType] = None
+    duration_days: int = Field(default=7, ge=1, le=52)
+    existing_policy_id: Optional[str] = None
+
+
+class PolicyPaymentOrderResponse(BaseModel):
+    checkout_mode: str
+    key_id: str
+    order_id: str
+    amount: int
+    currency: str = "INR"
+    rider_id: str
+    zone_id: str
+    persona: PersonaType
+    duration_days: int
+    premium: float
+    coverage: float
+    flow_type: PaymentFlowType
+    notes: dict = {}
+    prefill: dict = {}
+
+
+class PolicyPaymentConfirmRequest(BaseModel):
+    flow_type: PaymentFlowType = PaymentFlowType.NEW_POLICY
+    order_id: str
+    payment_id: str
+    signature: Optional[str] = None
+    rider_id: Optional[str] = None
+    zone_id: Optional[str] = None
+    persona: Optional[PersonaType] = None
+    duration_days: int = Field(default=7, ge=1, le=52)
+    existing_policy_id: Optional[str] = None
+
+
 # Agent Schemas
 class AgentAction(BaseModel):
     agent_name: str
@@ -458,6 +501,17 @@ class APIResponse(BaseModel):
     success: bool
     message: str
     data: Optional[dict] = None
+
+
+class AdminLoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class AdminTokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
 
 
 ZoneWithTriggers.model_rebuild()

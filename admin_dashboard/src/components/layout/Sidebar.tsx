@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   FileText,
@@ -29,8 +29,15 @@ const navItems = [
 ];
 
 export function Sidebar() {
+  const router = useRouter();
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  async function handleLogout() {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    router.push('/login');
+    router.refresh();
+  }
 
   return (
     <aside
@@ -92,7 +99,7 @@ export function Sidebar() {
             </div>
           )}
           {!isCollapsed && (
-            <button className="rounded-lg p-2 hover:bg-slate-100">
+            <button className="rounded-lg p-2 hover:bg-slate-100" onClick={handleLogout}>
               <LogOut className="h-4 w-4 text-slate-500" />
             </button>
           )}

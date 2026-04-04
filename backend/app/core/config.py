@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     CORS_ORIGINS: List[str] = ["*"]
+    ADMIN_USERNAME: str = "admin"
+    ADMIN_PASSWORD: str = "auxilia123"
     
     # External APIs
     OPENWEATHER_API_KEY: str = ""

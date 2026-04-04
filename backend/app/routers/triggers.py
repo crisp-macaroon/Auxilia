@@ -23,6 +23,7 @@ from app.services.traffic_service import traffic_service
 from app.services.news_service import news_service
 from app.services.surge_service import surge_service
 from app.services.location_service import location_service
+from app.core.security import require_admin
 
 router = APIRouter(prefix="/triggers", tags=["Triggers"])
 
@@ -231,7 +232,7 @@ async def _build_trigger_snapshot(zone_ctx: dict) -> dict:
 
 
 @router.get("/status")
-async def get_trigger_status():
+async def get_trigger_status(_admin: dict = Depends(require_admin)):
     """
     Get current trigger status for all zones.
     Returns active triggers with real-time data.
@@ -309,7 +310,7 @@ async def check_all_triggers(
 
 
 @router.get("/active")
-async def get_active_triggers():
+async def get_active_triggers(_admin: dict = Depends(require_admin)):
     """Get all currently active triggers across all zones."""
     active = trigger_agent.get_active_triggers()
     
@@ -338,7 +339,8 @@ async def get_trigger_history(
     zone_id: Optional[str] = None,
     trigger_type: Optional[TriggerType] = None,
     limit: int = 100,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _admin: dict = Depends(require_admin),
 ):
     """Get historical trigger events."""
     query = select(TriggerEvent)
@@ -475,7 +477,8 @@ async def get_zone_surge(
 async def get_affected_policies(
     zone_id: str,
     trigger_type: Optional[TriggerType] = None,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _admin: dict = Depends(require_admin),
 ):
     """Get count of policies affected by triggers in a zone."""
     query = select(func.count(Policy.id)).where(

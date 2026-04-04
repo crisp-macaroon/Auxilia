@@ -149,13 +149,13 @@ class _SummaryCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '${summary['paid'] ?? 0}',
+                '${summary['settled'] ?? summary['paid'] ?? 0}',
                 style: AppTypography.displaySmall.copyWith(
                   color: AppColors.white,
                 ),
               ),
               Text(
-                'Paid',
+                'Settled',
                 style: AppTypography.labelSmall.copyWith(
                   color: AppColors.white.withOpacity(0.84),
                 ),
@@ -271,7 +271,7 @@ class _ClaimCard extends StatelessWidget {
         return Icons.water_drop_rounded;
       case 'traffic':
         return Icons.traffic_rounded;
-      case 'accident':
+      case 'road_disruption':
         return Icons.warning_amber_rounded;
       default:
         return Icons.trending_down_rounded;

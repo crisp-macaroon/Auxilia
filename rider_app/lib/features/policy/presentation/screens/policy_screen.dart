@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 import '../../../../core/providers/providers.dart';
 import '../../../../core/theme/theme.dart';
@@ -13,6 +14,8 @@ class PolicyScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final policyAsync = ref.watch(activePolicyProvider);
+    final latestPolicyAsync = ref.watch(latestPolicyProvider);
+    final riderAsync = ref.watch(currentRiderProvider);
     final weatherAsync = ref.watch(weatherProvider);
     final triggersAsync = ref.watch(triggersProvider);
     final newsAsync = ref.watch(zoneNewsProvider);
@@ -24,6 +27,7 @@ class PolicyScreen extends ConsumerWidget {
         child: RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(activePolicyProvider);
+            ref.invalidate(latestPolicyProvider);
             ref.invalidate(weatherProvider);
             ref.invalidate(triggersProvider);
             ref.invalidate(zoneNewsProvider);
@@ -46,7 +50,16 @@ class PolicyScreen extends ConsumerWidget {
                 policyAsync.when(
                   data: (policy) {
                     if (policy == null) {
-                      return const _EmptyPolicyCard();
+                      final latestPolicy = latestPolicyAsync.valueOrNull;
+                      final rider = riderAsync.valueOrNull;
+                      if (latestPolicy != null) {
+                        return _PolicyHero(policy: latestPolicy);
+                      }
+                      return _EmptyPolicyCard(
+                        subtitle: rider == null
+                            ? 'Complete onboarding and create a policy to see live protection data.'
+                            : 'You are already onboarded. Buy your first policy to start protection.',
+                      );
                     }
                     return _PolicyHero(policy: policy);
                   },
@@ -57,8 +70,9 @@ class PolicyScreen extends ConsumerWidget {
                 // Policy Actions
                 policyAsync.when(
                   data: (policy) {
-                    if (policy == null) return const SizedBox.shrink();
-                    return _PolicyActions(policy: policy);
+                    final effectivePolicy = policy ?? latestPolicyAsync.valueOrNull;
+                    if (effectivePolicy == null) return const SizedBox.shrink();
+                    return _PolicyActions(policy: effectivePolicy);
                   },
                   loading: () => const SizedBox.shrink(),
                   error: (_, _) => const SizedBox.shrink(),
@@ -68,10 +82,11 @@ class PolicyScreen extends ConsumerWidget {
                 policyAsync
                     .when(
                       data: (policy) {
-                        if (policy == null) {
+                        final effectivePolicy = policy ?? latestPolicyAsync.valueOrNull;
+                        if (effectivePolicy == null) {
                           return const SizedBox.shrink();
                         }
-                        return _PolicyDetailsCard(policy: policy);
+                        return _PolicyDetailsCard(policy: effectivePolicy);
                       },
                       loading: () => const _LoadingBlock(height: 210),
                       error: (_, _) => const SizedBox.shrink(),
@@ -277,20 +292,104 @@ class _PolicyActions extends ConsumerStatefulWidget {
 
 class _PolicyActionsState extends ConsumerState<_PolicyActions> {
   bool _loading = false;
+  late final Razorpay _razorpay;
+  int? _pendingWeeks;
+  Map<String, dynamic>? _pendingOrder;
+
+  @override
+  void initState() {
+    super.initState();
+    _razorpay = Razorpay();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+  }
+
+  @override
+  void dispose() {
+    _razorpay.clear();
+    super.dispose();
+  }
 
   Future<void> _renewPolicy(int weeks) async {
     setState(() => _loading = true);
 
     final api = ref.read(apiServiceProvider);
-    final response = await api.renewPolicy(
-      policyId: widget.policy.id,
-      durationWeeks: weeks,
+    _pendingWeeks = weeks;
+
+    final orderResponse = await api.createPolicyPaymentOrder(
+      flowType: 'renew_policy',
+      existingPolicyId: widget.policy.id,
+      durationDays: weeks * 7,
     );
+
+    if (!mounted) return;
+
+    if (!orderResponse.success || orderResponse.data == null) {
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(orderResponse.error ?? 'Failed to start renewal payment'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+      return;
+    }
+
+    _pendingOrder = orderResponse.data;
+
+    if ((orderResponse.data!['checkout_mode'] ?? 'sandbox') == 'sandbox') {
+      await _confirmRenewal(
+        orderId: orderResponse.data!['order_id'] as String,
+        paymentId: 'sandbox_payment_${DateTime.now().millisecondsSinceEpoch}',
+        signature: 'sandbox_signature',
+      );
+      return;
+    }
+
+    _razorpay.open({
+      'key': orderResponse.data!['key_id'],
+      'amount': orderResponse.data!['amount'],
+      'name': 'Auxilia',
+      'description': 'Policy renewal',
+      'order_id': orderResponse.data!['order_id'],
+      'prefill': orderResponse.data!['prefill'] ?? {},
+      'theme': {'color': '#F97316'},
+    });
+  }
+
+  Future<void> _confirmRenewal({
+    required String orderId,
+    required String paymentId,
+    String? signature,
+  }) async {
+    final api = ref.read(apiServiceProvider);
+    final weeks = _pendingWeeks;
+    if (_pendingOrder == null || weeks == null) {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+      return;
+    }
+
+    final response = await api.confirmPolicyPayment(
+      flowType: 'renew_policy',
+      orderId: orderId,
+      paymentId: paymentId,
+      signature: signature,
+      existingPolicyId: widget.policy.id,
+      durationDays: weeks * 7,
+    );
+
+    if (!mounted) return;
 
     setState(() => _loading = false);
 
     if (response.success) {
       ref.invalidate(activePolicyProvider);
+      ref.invalidate(latestPolicyProvider);
+      ref.invalidate(claimsProvider);
+      ref.invalidate(claimsSummaryProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -313,11 +412,53 @@ class _PolicyActionsState extends ConsumerState<_PolicyActions> {
     }
   }
 
+  void _handlePaymentSuccess(PaymentSuccessResponse response) {
+    final fallbackOrderId = _pendingOrder?['order_id'] as String?;
+    final orderId = response.orderId ?? fallbackOrderId;
+    if (orderId == null) {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+      return;
+    }
+
+    _confirmRenewal(
+      orderId: orderId,
+      paymentId: response.paymentId ?? '',
+      signature: response.signature,
+    );
+  }
+
+  void _handlePaymentError(PaymentFailureResponse response) {
+    if (!mounted) return;
+    setState(() => _loading = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(response.message ?? 'Renewal payment cancelled'),
+        backgroundColor: AppColors.danger,
+      ),
+    );
+  }
+
+  void _handleExternalWallet(ExternalWalletResponse response) {
+    if (!mounted) return;
+    setState(() => _loading = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${response.walletName ?? 'External wallet'} is not supported'),
+        backgroundColor: AppColors.warning,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final daysLeft = widget.policy.daysRemaining;
     final showRenew =
         daysLeft <= 3; // Show renew option when 3 or fewer days left
+    final renewMessage = widget.policy.isActive
+        ? 'Your policy expires in $daysLeft day${daysLeft != 1 ? 's' : ''}. Renew now to stay protected.'
+        : 'Your last policy has expired. Renew now to restore protection.';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -346,7 +487,7 @@ class _PolicyActionsState extends ConsumerState<_PolicyActions> {
           if (showRenew) ...[
             const SizedBox(height: 8),
             Text(
-              'Your policy expires in $daysLeft day${daysLeft != 1 ? 's' : ''}. Renew now to stay protected.',
+              renewMessage,
               style: AppTypography.bodySmall.copyWith(
                 color: AppColors.textSecondary,
               ),

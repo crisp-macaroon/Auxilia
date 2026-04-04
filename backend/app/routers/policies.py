@@ -17,6 +17,7 @@ from app.models.schemas import (
     PolicyStatus, PersonaType, PremiumCalculation, APIResponse
 )
 from app.agents.risk_agent import risk_agent
+from app.core.security import get_optional_admin, require_admin
 import hashlib
 
 router = APIRouter(prefix="/policies", tags=["Policies"])
@@ -116,9 +117,12 @@ async def list_policies(
     status: Optional[PolicyStatus] = None,
     zone_id: Optional[str] = None,
     rider_id: Optional[str] = None,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    admin: Optional[dict] = Depends(get_optional_admin),
 ):
     """List all policies with optional filters."""
+    if rider_id is None and admin is None:
+        raise HTTPException(status_code=401, detail="Missing admin token")
     query = select(Policy)
     
     if status:
@@ -154,7 +158,8 @@ async def get_policy(
 @router.get("/{policy_id}/details")
 async def get_policy_details(
     policy_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _admin: dict = Depends(require_admin),
 ):
     """Get policy with rider and zone details."""
     result = await db.execute(
@@ -361,12 +366,16 @@ async def calculate_premium(
 
 @router.get("/stats/overview")
 async def get_policy_stats(
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _admin: dict = Depends(require_admin),
 ):
     """Get overall policy statistics."""
     total = await db.execute(select(func.count(Policy.id)))
     active = await db.execute(
-        select(func.count(Policy.id)).where(Policy.status == PolicyStatus.ACTIVE.value)
+        select(func.count(Policy.id)).where(
+            Policy.status == PolicyStatus.ACTIVE.value,
+            Policy.end_date > datetime.utcnow(),
+        )
     )
     total_premium = await db.execute(select(func.sum(Policy.premium)))
     total_coverage = await db.execute(select(func.sum(Policy.coverage)))

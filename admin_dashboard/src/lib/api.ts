@@ -1,12 +1,26 @@
 import { API_BASE_URL } from '@/lib/constants';
+import { ADMIN_TOKEN_COOKIE } from '@/lib/auth';
 
 type FetchOptions = {
   cache?: RequestCache;
 };
 
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  if (typeof window !== 'undefined') {
+    return {};
+  }
+
+  const { cookies } = await import('next/headers');
+  const cookieStore = await cookies();
+  const token = cookieStore.get(ADMIN_TOKEN_COOKIE)?.value;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function apiFetch<T>(path: string, options?: FetchOptions): Promise<T> {
+  const headers = await getAuthHeaders();
   const response = await fetch(`${API_BASE_URL}${path}`, {
     cache: options?.cache ?? 'no-store',
+    headers,
   });
 
   if (!response.ok) {
@@ -286,11 +300,13 @@ export async function getClaimStats() {
 }
 
 export async function approveClaim(claimId: string) {
-  return fetch(`${API_BASE_URL}/claims/${claimId}/approve`, { method: 'POST' });
+  const headers = await getAuthHeaders();
+  return fetch(`${API_BASE_URL}/claims/${claimId}/approve`, { method: 'POST', headers });
 }
 
 export async function rejectClaim(claimId: string) {
-  return fetch(`${API_BASE_URL}/claims/${claimId}/reject`, { method: 'POST' });
+  const headers = await getAuthHeaders();
+  return fetch(`${API_BASE_URL}/claims/${claimId}/reject`, { method: 'POST', headers });
 }
 
 export async function getPolicies(params?: { status?: string }) {
@@ -306,9 +322,10 @@ export async function createPolicy(payload: {
   persona: 'qcommerce' | 'food_delivery';
   duration_days: number;
 }) {
+  const headers = await getAuthHeaders();
   const response = await fetch(`${API_BASE_URL}/policies/`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error(`Create policy failed: ${response.status}`);
@@ -320,13 +337,15 @@ export async function getPolicyDetails(policyId: string) {
 }
 
 export async function cancelPolicy(policyId: string) {
-  const response = await fetch(`${API_BASE_URL}/policies/${policyId}/cancel`, { method: 'POST' });
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_BASE_URL}/policies/${policyId}/cancel`, { method: 'POST', headers });
   if (!response.ok) throw new Error(`Cancel policy failed: ${response.status}`);
   return response.json() as Promise<{ success: boolean; message: string }>;
 }
 
 export async function renewPolicy(policyId: string, durationDays = 7) {
-  const response = await fetch(`${API_BASE_URL}/policies/${policyId}/renew?duration_days=${durationDays}`, { method: 'POST' });
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_BASE_URL}/policies/${policyId}/renew?duration_days=${durationDays}`, { method: 'POST', headers });
   if (!response.ok) throw new Error(`Renew policy failed: ${response.status}`);
   return response.json() as Promise<{ success: boolean }>;
 }
@@ -358,9 +377,10 @@ export async function updateRider(
     status: 'active' | 'inactive' | 'suspended';
   }>
 ) {
+  const headers = await getAuthHeaders();
   const response = await fetch(`${API_BASE_URL}/riders/${riderId}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error(`Update rider failed: ${response.status}`);
@@ -392,7 +412,8 @@ export async function getTriggerStatus() {
 }
 
 export async function triggerRefresh() {
-  return fetch(`${API_BASE_URL}/triggers/check`, { method: 'POST' });
+  const headers = await getAuthHeaders();
+  return fetch(`${API_BASE_URL}/triggers/check`, { method: 'POST', headers });
 }
 
 export async function getRevenueMetrics(days = 7) {
