@@ -28,8 +28,6 @@ export default function RidersPage() {
   const [selectedPolicies, setSelectedPolicies] = useState<PolicyListItem[]>([]);
   const [selectedClaims, setSelectedClaims] = useState<ClaimListItem[]>([]);
   const [zones, setZones] = useState<ZoneListItem[]>([]);
-  const [assigningRiderId, setAssigningRiderId] = useState<string | null>(null);
-  const [assignZoneId, setAssignZoneId] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [newRider, setNewRider] = useState({ name: '', phone: '', persona: 'qcommerce' as const, zone_id: '' });
 
@@ -46,6 +44,9 @@ export default function RidersPage() {
       setRiders(items);
       setStats(overview);
       setZones(zoneItems);
+      if (zoneItems.length > 0) {
+        setNewRider((current) => current.zone_id ? current : { ...current, zone_id: zoneItems[0].id });
+      }
     }
     void load();
   }, []);
@@ -73,9 +74,7 @@ export default function RidersPage() {
         </div>
         <div className="flex items-center gap-3">
           <button onClick={() => {
-            const csv = 'ID,Name,Phone,Persona,Zone,Status,Risk
-' + riders.map(r => `${r.id},${r.name},${r.phone},${r.persona},${r.zone_id},${r.status},${r.risk_score}`).join('
-');
+            const csv = 'ID,Name,Phone,Persona,Risk Basis,Status,Risk\n' + riders.map(r => `${r.id},${r.name},${r.phone},${r.persona},delivery_path_dynamic,${r.status},${r.risk_score}`).join('\n');
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -111,12 +110,11 @@ export default function RidersPage() {
         {filteredRiders.map((rider) => {
           const avatar = rider.name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
           const menuOpen = activeMenuRiderId === rider.id;
-          const assigning = assigningRiderId === rider.id;
           return (
             <div key={rider.id} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md">
               <div className="flex items-start justify-between"><div className="flex items-center gap-4"><div className={cn('flex h-14 w-14 items-center justify-center rounded-full text-lg font-bold text-white', rider.persona === 'qcommerce' ? 'bg-gradient-to-br from-orange-500 to-orange-600' : 'bg-gradient-to-br from-purple-500 to-purple-600')}>{avatar}</div><div><h3 className="font-semibold text-slate-900">{rider.name}</h3><p className="text-sm text-slate-500">{rider.id}</p></div></div><span className={cn('inline-flex rounded-full border px-2.5 py-1 text-xs font-medium capitalize', getStatusBadgeClass(rider.status))}>{rider.status}</span></div>
 
-              <div className="mt-4 space-y-2"><div className="flex items-center gap-2 text-sm text-slate-600"><Phone className="h-4 w-4 text-slate-400" />{rider.phone}</div><div className="flex items-center gap-2 text-sm text-slate-600"><MapPin className="h-4 w-4 text-slate-400" />{rider.zone_id}</div><div className="flex items-center gap-2 text-sm text-slate-600"><Bike className="h-4 w-4 text-slate-400" /><span className="capitalize">{rider.persona.replace('_', ' ')}</span></div></div>
+              <div className="mt-4 space-y-2"><div className="flex items-center gap-2 text-sm text-slate-600"><Phone className="h-4 w-4 text-slate-400" />{rider.phone}</div><div className="flex items-center gap-2 text-sm text-slate-600"><MapPin className="h-4 w-4 text-slate-400" />Dynamic delivery path risk</div><div className="flex items-center gap-2 text-sm text-slate-600"><Bike className="h-4 w-4 text-slate-400" /><span className="capitalize">{rider.persona.replace('_', ' ')}</span></div></div>
 
               <div className="mt-4 grid grid-cols-2 gap-4 border-t border-slate-100 pt-4"><div className="text-center"><p className="text-lg font-bold text-slate-900">{(rider.risk_score * 100).toFixed(0)}%</p><p className="text-xs text-slate-500">Risk</p></div><div className="text-center"><p className="text-lg font-bold text-slate-900">{rider.status}</p><p className="text-xs text-slate-500">Status</p></div></div>
               <div className="mt-3"><div className="h-2 w-full rounded-full bg-slate-100"><div className={cn('h-2 rounded-full transition-all', rider.risk_score < 0.3 ? 'bg-green-500' : rider.risk_score < 0.6 ? 'bg-yellow-500' : 'bg-red-500')} style={{ width: `${rider.risk_score * 100}%` }} /></div></div>
@@ -139,9 +137,6 @@ export default function RidersPage() {
                     <button className="w-full rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100" onClick={async () => { const [r, riderPolicies, riderClaims] = await Promise.all([getRider(rider.id), getRiderPolicies(rider.id), getRiderClaims(rider.id)]); setSelectedRider(r); setSelectedPolicies(riderPolicies.policies); setSelectedClaims(riderClaims.claims); setActiveMenuRiderId(null); }}>
                       View profile
                     </button>
-                    <button className="w-full rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100" onClick={() => { setAssigningRiderId(rider.id); setAssignZoneId(rider.zone_id); setActiveMenuRiderId(null); }}>
-                      Assign zone
-                    </button>
                     <button className="w-full rounded-md px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50" onClick={async () => { await updateRider(rider.id, { status: 'suspended' }); await reload(); setActiveMenuRiderId(null); }}>
                       Suspend rider
                     </button>
@@ -149,26 +144,6 @@ export default function RidersPage() {
                 ) : null}
               </div>
 
-              {assigning ? (
-                <div className="mt-3 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <select value={assignZoneId} onChange={(e) => setAssignZoneId(e.target.value)} className="w-full rounded-md border border-slate-200 px-2 py-2 text-sm">
-                    {zones.map((z) => <option key={z.id} value={z.id}>{z.name} ({z.city})</option>)}
-                  </select>
-                  <div className="flex justify-end gap-2">
-                    <button className="rounded-md bg-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700" onClick={() => setAssigningRiderId(null)}>Cancel</button>
-                    <button
-                      className="rounded-md bg-orange-500 px-3 py-1.5 text-xs font-medium text-white"
-                      onClick={async () => {
-                        await updateRider(rider.id, { zone_id: assignZoneId });
-                        await reload();
-                        setAssigningRiderId(null);
-                      }}
-                    >
-                      Save
-                    </button>
-                  </div>
-                </div>
-              ) : null}
             </div>
           );
         })}
@@ -194,12 +169,8 @@ export default function RidersPage() {
                   <option value="food_delivery">Food Delivery</option>
                 </select>
               </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Zone</label>
-                <select value={newRider.zone_id} onChange={e => setNewRider({...newRider, zone_id: e.target.value})} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-orange-500">
-                  <option value="">Select a zone</option>
-                  {zones.map(z => <option key={z.id} value={z.id}>{z.name} ({z.city})</option>)}
-                </select>
+              <div className="rounded-xl border border-orange-100 bg-orange-50 p-3 text-sm text-orange-900">
+                Rider risk routing is delivery-driven. Auxilia will infer active risk from delivery destination and route path instead of manual zone assignment.
               </div>
             </div>
             <div className="mt-6 flex justify-end gap-3">
@@ -209,7 +180,7 @@ export default function RidersPage() {
                 await createRider(newRider);
                 await reload();
                 setShowAddModal(false);
-                setNewRider({ name: '', phone: '', persona: 'qcommerce', zone_id: '' });
+                setNewRider({ name: '', phone: '', persona: 'qcommerce', zone_id: zones[0]?.id ?? '' });
               }} className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600">Save Rider</button>
             </div>
           </div>
@@ -223,7 +194,7 @@ export default function RidersPage() {
             <div className="mt-3 grid grid-cols-1 gap-2 text-sm text-slate-700 md:grid-cols-2">
               <p><span className="font-medium text-slate-900">Name:</span> {selectedRider.name}</p>
               <p><span className="font-medium text-slate-900">Phone:</span> {selectedRider.phone}</p>
-              <p><span className="font-medium text-slate-900">Zone:</span> {selectedRider.zone_id}</p>
+              <p><span className="font-medium text-slate-900">Risk Basis:</span> Delivery destination + path analysis</p>
               <p><span className="font-medium text-slate-900">Status:</span> {selectedRider.status}</p>
             </div>
 

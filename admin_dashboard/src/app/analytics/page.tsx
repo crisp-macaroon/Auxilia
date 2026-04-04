@@ -139,13 +139,21 @@ export default async function AnalyticsPage() {
           </div>
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <div>
-            <h4 className="text-sm font-semibold text-slate-900">Zone Performance</h4>
+        <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h4 className="text-sm font-semibold text-slate-900">Zone Performance</h4>
+                <p className="text-xs text-slate-500">Claims intensity across active delivery corridors</p>
+              </div>
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600">
+                {visibleZones.length} zones
+              </span>
+            </div>
             {visibleZones.length > 0 ? (
-              <div className="mt-3 max-h-96 space-y-3 overflow-y-auto pr-1">
+              <div className="mt-4 space-y-4">
                 {visibleZones.map((zone) => (
-                  <div key={zone.zone_id}>
+                  <div key={zone.zone_id} className="rounded-xl border border-white bg-white p-3 shadow-sm">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium text-slate-700">{zone.name}</span>
                       <span className="text-slate-500">{zone.total_claims} claims</span>
@@ -164,12 +172,20 @@ export default async function AnalyticsPage() {
             )}
           </div>
 
-          <div>
-            <h4 className="text-sm font-semibold text-slate-900">Persona Mix</h4>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h4 className="text-sm font-semibold text-slate-900">Persona Mix</h4>
+                <p className="text-xs text-slate-500">Current distribution of covered delivery workers</p>
+              </div>
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600">
+                {totalPersonas} riders
+              </span>
+            </div>
             {personas.personas.length > 0 ? (
-              <div className="mt-3 space-y-3">
+              <div className="mt-4 space-y-4">
                 {personas.personas.map((persona) => (
-                  <div key={persona.persona}>
+                  <div key={persona.persona} className="rounded-xl border border-white bg-white p-3 shadow-sm">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium capitalize text-slate-700">{persona.persona.replace('_', ' ')}</span>
                       <span className="text-slate-900">{persona.count}</span>
