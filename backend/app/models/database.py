@@ -44,6 +44,7 @@ class Rider(Base):
     id = Column(String(36), primary_key=True)
     name = Column(String(100), nullable=False)
     phone = Column(String(15), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=True)
     email = Column(String(100), unique=True, nullable=True)
     persona = Column(Enum(PersonaType), nullable=False)
     zone_id = Column(String(50), nullable=False, index=True)

@@ -529,6 +529,29 @@ class AdminLoginRequest(BaseModel):
     password: str
 
 
+class RiderRegisterRequest(BaseModel):
+    name: str = Field(..., min_length=2, max_length=100)
+    phone: str = Field(..., pattern=r"^\+?[1-9]\d{9,14}$")
+    password: str = Field(..., min_length=6, max_length=128)
+    email: Optional[str] = None
+    persona: PersonaType
+    zone_id: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+
+class RiderLoginRequest(BaseModel):
+    phone: str = Field(..., pattern=r"^\+?[1-9]\d{9,14}$")
+    password: str = Field(..., min_length=6, max_length=128)
+
+
+class RiderTokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+    rider: RiderResponse
+
+
 class AdminTokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
