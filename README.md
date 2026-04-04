@@ -1,142 +1,163 @@
 # Auxilia
 
-Auxilia is an income protection platform for gig workers, built around one frustrating reality: when a rider can't earn because of rain, a traffic jam, or a road closure, they shouldn't have to fill out forms and wait.
+Auxilia is a parametric income-protection platform for gig workers. It combines a rider mobile app, an admin operations dashboard, and a FastAPI backend that monitors live disruption signals like rain, traffic, and road incidents to support dynamic protection, claims, and operational decision-making.
 
----
+Live website: `https://auxilia.sabarixr.me`
 
-## What this project does
+Primary focus: high-pressure Q-commerce and food-delivery riders, where 10-minute delivery promises, dense urban routing, and disruption-sensitive earnings create very different risk profiles.
 
-Three apps working together:
+## Project Overview
 
-- `rider_app` (Flutter): what riders see — onboarding, their policy, live conditions, and filing a claim.
-- `admin_dashboard` (Next.js): ops-side view for policies, claims, triggers, riders, and analytics.
-- `backend` (FastAPI): the core — risk evaluation, trigger logic, fraud checks, payouts, zone data.
+This repo contains three connected applications:
 
-Current focus: Q-commerce riders, Rs 99/week, covering loss of income.
+- `backend/` - FastAPI API, auth, policies, claims, triggers, payments, risk analysis, seed data
+- `admin_dashboard/` - Next.js admin panel for riders, policies, claims, analytics, and triggers
+- `rider_app/` - Flutter app for onboarding, rider login, policy purchase, claims, and map-based route risk
 
----
+## Main Features
 
-## Why Auxilia exists
+### Rider App
 
-Gig workers get hit by short, local disruptions that can wipe out a day's pay:
+- rider onboarding with persona selection and profile setup
+- rider login with phone number and password
+- weekly policy purchase and renewal
+- Razorpay checkout integration
+- live policy, claims, and trigger visibility
+- delivery check-in support
+- interactive map-based route risk analysis
+- destination pin selection and route visualization
+- profile settings and logout
 
-- heavy rain or flooding
-- traffic gridlock
-- road-level incidents
-- demand dropping out
+### Admin Dashboard
 
-Normal insurance wasn't built for this. It's slow, document-heavy, and doesn't care that the disruption was two hours long and very real. Auxilia tries to evaluate these events fast, using live signals instead of paperwork.
+- admin login protected with backend-issued JWTs
+- riders, policies, claims, triggers, and analytics views
+- add rider flow
+- CSV export for riders and policies
+- dynamic header notifications from live backend data
+- dashboard metrics reflecting real claims and paid amounts
 
----
+### Backend
 
-## How it works
+- rider and admin authentication
+- rider, zone, policy, claim, trigger, and dashboard APIs
+- Razorpay order creation and payment confirmation
+- live trigger polling for rain, traffic, surge, and road disruption
+- dynamic risk evaluation
+- rider-segment analysis using persona, age band, vehicle type, shift type, and tenure
+- route risk analysis from rider location to delivery destination
+- local seeding for demo and development data
 
-1. Rider is onboarded with an active weekly policy.
-2. Their location and delivery check-in data are used to build delivery context.
-3. The backend evaluates live triggers — weather, traffic, incidents, surge.
-4. Risk and fraud checks run before any payout decision.
-5. Claims and metrics show up in both the rider app and admin dashboard.
+## How Auxilia Works
 
-The backend exposes routes under `/api/v1` covering riders, policies, claims, triggers, zones, dashboard, and weather. Health check at `/health`, API docs at `/docs`.
+1. A rider signs up or logs in on the mobile app.
+2. The rider purchases a weekly protection plan.
+3. The backend tracks live disruption signals and rider delivery context.
+4. Risk is calculated using location, trigger data, incidents, and delivery path context.
+5. Claims and operational activity become visible in both the rider app and admin dashboard.
 
----
+## Risk Lens
 
-## AI in the backend (the practical part)
+Auxilia is designed around disruption types that directly affect gig income:
 
-Four agent-style components handle the heavy lifting:
+- heavy rain and flooding
+- traffic gridlock and road closures
+- road incidents and corridor slowdowns
+- surge drops and demand collapse
+- platform/app outages that pause dispatch flow
+- EV charging delays and energy-dependent downtime
 
-- **TriggerAgent** — watches live conditions for valid trigger events.
-- **RiskAgent** — computes dynamic risk from location and context.
-- **FraudAgent** — checks claim consistency and flags suspicious patterns.
-- **PayoutAgent** — handles the payout decision path and records transaction evidence.
+The backend now also models rider-segment exposure with additional context such as age band, shift type, vehicle type, and delivery tenure so risk is not explained only by geography.
 
-We also pull external signals (incident feeds, news) to catch disruptions that raw weather or traffic data might miss.
+Example positioning used in the project:
 
----
+- food delivery baseline plan around `Rs 99/week`
+- Q-commerce riders priced higher due to tighter SLA pressure and route urgency
+- late-night and newer riders receive stronger cautionary recommendations in elevated-risk corridors
 
-## Anti-spoofing
+## Tech Stack
 
-A single GPS coordinate can be faked. So we don't rely on one.
+- Backend: FastAPI, SQLAlchemy, Pydantic, SQLite, JWT auth
+- Admin Dashboard: Next.js, React, TypeScript, Tailwind CSS
+- Rider App: Flutter, Riverpod, Dio, GoRouter, flutter_map, Geolocator
+- Integrations: Razorpay, OpenWeatherMap, TomTom, NewsAPI, Gemini
 
-### How we tell genuine riders from spoofers
+## Repository Structure
 
-We look at consistency across time, not a single data point:
-
-- Does the movement make physical sense? Natural routes vs impossible jumps.
-- Does the check-in timing line up with the trigger window?
-- What's the rider's behavior pattern during claim windows?
-- Are multiple riders in the same zone all claiming at the same moment?
-
-### Signals beyond raw coordinates
-
-- Sequential location stream — speed, stops, distance deltas
-- Delivery check-in coordinates and order timestamps
-- Active trigger context at the time of the claim
-- Claim frequency, cooldown violations, duplicates
-- Cluster-level synchronization patterns that suggest coordinated abuse
-
-### Keeping it fair for honest riders
-
-Bad network coverage is real. We don't hard-reject riders because their GPS was spotty.
-
-Three outcomes:
-
-1. Verified → fast payout
-2. Uncertain → lightweight review
-3. High-risk → hold + manual escalation
-
----
-
-## Repo structure
-
-```
+```text
 Auxilia/
-├── backend/           FastAPI backend, agents, routers, services, seed script
-├── admin_dashboard/   Next.js admin app
-├── rider_app/         Flutter rider app
-└── README.md
+|- backend/
+|- admin_dashboard/
+|- rider_app/
+|- .env.sample
+|- README.md
 ```
 
----
+## Local Setup
 
-## Local setup
+### Backend
 
-### 1) Backend
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+cp ../.env.sample .env
+python seed.py
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
 
-From `backend/`:
+Backend docs: `http://localhost:8000/docs`
 
-1. Create and activate a Python virtual environment.
-2. `pip install -r requirements.txt`
-3. `cp .env.example .env`
-4. Fill in API keys (OpenWeatherMap, TomTom, NewsAPI, Gemini).
-5. `python main.py`
+### Admin Dashboard
 
-Runs on `http://localhost:8000`. Docs at `/docs`.
+```bash
+cd admin_dashboard
+npm install
+npm run dev
+```
 
-Optional seed data: `python scripts/seed_data.py`
+Dashboard runs on `http://localhost:3000`
 
-### 2) Admin dashboard
+### Rider App
 
-From `admin_dashboard/`:
+```bash
+cd rider_app
+flutter pub get
+flutter run
+```
 
-1. `npm install`
-2. Set `NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1` if on localhost.
-3. `npm run dev`
+For emulator/physical device testing, set the API base URL in `rider_app/lib/core/services/api_service.dart` to a reachable backend host.
 
-Runs on `http://localhost:3000`.
+## Environment Setup
 
-### 3) Rider app
+Use the root sample env file as the single source of truth:
 
-From `rider_app/`:
+```bash
+cp .env.sample backend/.env
+cp .env.sample admin_dashboard/.env.local
+```
 
-1. `flutter pub get`
-2. In `rider_app/lib/core/services/api_service.dart`, replace the base URL with your machine's local IP — something like `http://192.168.x.x:8000`. Don't use `localhost`; the Android device won't resolve it.
-3. `flutter run -d <YOUR_DEVICE_ID>`
+Then update only the variables each app needs.
 
----
+`.env.sample` includes:
 
-## Current status
+- backend app and database settings
+- JWT and admin credentials
+- weather, traffic, incident, and AI provider keys
+- Razorpay configuration
+- payout and trigger thresholds
+- admin dashboard API URL
 
-This is a live hackathon build. Things move fast. As of now all the basic UI and backend architecture are done, at present working on making the fraud detection and better zone based method improvement.
+## Seeded Demo Rider
 
-Demo video: [watch here](https://youtu.be/o00wG1vSz_Q)
+After running `python seed.py`, you can log in with:
+
+- phone: `+919876543200`
+- password: `rider123`
+
+Seeded rider records also include richer segment fields such as age band, vehicle type, shift type, and tenure months for demo analytics.
+
+## Current Status
+
+Auxilia is in strong demo-ready shape with working core flows across onboarding, rider login, policy purchase, admin visibility, trigger monitoring, and map-based route risk.
