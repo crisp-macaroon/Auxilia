@@ -935,9 +935,9 @@ class _HelpSupportSheet extends StatelessWidget {
             child: ListView(
               children: const [
                 _FAQItem(
-                  question: 'How does GigShield work?',
+                  question: 'How does Auxilia work?',
                   answer:
-                      'GigShield uses AI to monitor real-time conditions like weather, traffic, and road disruptions in your zone. When these events affect your ability to earn, we automatically process a claim and pay you for lost income.',
+                      'Auxilia uses AI to monitor real-time conditions like weather, traffic, and road disruptions in your zone. When these events affect your ability to earn, we automatically process a claim and pay you for lost income.',
                 ),
                 _FAQItem(
                   question: 'What triggers a claim?',
@@ -1066,7 +1066,7 @@ class _ContactCard extends StatelessWidget {
                   label: 'Email',
                   onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('support@gigshield.ai')),
+                      const SnackBar(content: Text('support@auxilia.sabarixr.me')),
                     );
                   },
                 ),
