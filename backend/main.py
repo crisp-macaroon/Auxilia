@@ -35,6 +35,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+async def ensure_rider_auth_columns() -> None:
+    async with engine.begin() as conn:
+        try:
+            await conn.exec_driver_sql("ALTER TABLE riders ADD COLUMN password_hash VARCHAR(255)")
+            logger.info("Added riders.password_hash column")
+        except Exception:
+            pass
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -48,6 +57,7 @@ async def lifespan(app: FastAPI):
     # Create database tables
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    await ensure_rider_auth_columns()
     logger.info("Database tables created")
     
     # Start trigger agent polling in background

@@ -12,6 +12,7 @@ import random
 from datetime import datetime, timedelta
 
 from app.core.database import engine, Base, AsyncSessionLocal
+from app.core.security import hash_password
 from app.models.database import Zone, Rider, Policy, Claim, TriggerEvent
 from app.models.database import PersonaType, RiderStatus, PolicyStatus, ClaimStatus, TriggerType
 from app.agents.trigger_agent import ZONE_CONFIG
@@ -73,6 +74,7 @@ async def seed_mock_data(zone_ids):
                 id=str(uuid.uuid4()),
                 name=name,
                 phone=f"+9198765432{i:02d}",
+                password_hash=hash_password("rider123"),
                 email=f"rider{i}@example.com",
                 persona=random.choice(list(PersonaType)),
                 zone_id=random.choice(zone_ids),
