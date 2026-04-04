@@ -69,6 +69,9 @@ async def seed_mock_data(zone_ids):
         print("  Generating mock riders...")
         riders = []
         names = ["Amit Kumar", "Priya Singh", "Rahul Sharma", "Sneha Gupta", "Vikram Patel", "Anita Desai", "Rajesh Verma", "Neha Joshi", "Suresh Nair", "Kavita Reddy"]
+        age_bands = ["18-21", "22-25", "26-35", "36-45"]
+        vehicle_types = ["bike", "scooter", "ev_scooter"]
+        shift_types = ["lunch", "evening", "late_night", "mixed"]
         for i, name in enumerate(names):
             rider = Rider(
                 id=str(uuid.uuid4()),
@@ -78,6 +81,10 @@ async def seed_mock_data(zone_ids):
                 email=f"rider{i}@example.com",
                 persona=random.choice(list(PersonaType)),
                 zone_id=random.choice(zone_ids),
+                age_band=random.choice(age_bands),
+                vehicle_type=random.choice(vehicle_types),
+                shift_type=random.choice(shift_types),
+                tenure_months=random.randint(1, 48),
                 latitude=12.9716 + random.uniform(-0.05, 0.05),
                 longitude=77.5946 + random.uniform(-0.05, 0.05),
                 risk_score=random.uniform(0.1, 0.9),

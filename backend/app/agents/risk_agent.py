@@ -54,6 +54,29 @@ PERSONA_RISK_FACTOR = {
     PersonaType.FOOD_DELIVERY: 1.0  # Food delivery: baseline
 }
 
+AGE_BAND_RISK_FACTOR = {
+    "18-21": 1.08,
+    "22-25": 1.03,
+    "26-35": 1.0,
+    "36-45": 0.97,
+    "46+": 1.02,
+}
+
+VEHICLE_RISK_FACTOR = {
+    "bike": 1.08,
+    "scooter": 1.0,
+    "ev_scooter": 1.04,
+    "bicycle": 0.94,
+}
+
+SHIFT_RISK_FACTOR = {
+    "breakfast": 0.96,
+    "lunch": 1.0,
+    "evening": 1.05,
+    "late_night": 1.12,
+    "mixed": 1.03,
+}
+
 # Seasonal risk factors (monsoon months = higher risk)
 MONTHLY_RISK_FACTOR = {
     1: 0.9,   # January - dry
@@ -109,7 +132,8 @@ class RiskAgent:
         persona: PersonaType,
         lat: Optional[float] = None,
         lon: Optional[float] = None,
-        claim_history: List[Dict] = None
+        claim_history: List[Dict] = None,
+        rider_profile: Optional[Dict] = None,
     ) -> RiskAssessment:
         """
         Calculate comprehensive risk score for a rider.
@@ -138,6 +162,9 @@ class RiskAgent:
         
         # Calculate historical risk from claims
         historical_risk = self._calculate_historical_risk(claim_history or [])
+        demographic_risk, segment_summary = self._calculate_demographic_risk(
+            rider_profile or {}
+        )
         
         # Apply persona factor
         persona_factor = PERSONA_RISK_FACTOR.get(persona, 1.0)
@@ -147,13 +174,14 @@ class RiskAgent:
         seasonal_factor = MONTHLY_RISK_FACTOR.get(month, 1.0)
         
         # Combine risk factors
-        # Weighted combination: base(40%) + weather(20%) + traffic(15%) + incidents(10%) + history(15%)
+        # Weighted combination: base(34%) + weather(18%) + traffic(14%) + incidents(10%) + history(12%) + demographics(12%)
         combined_risk = (
-            base_risk * 0.40 +
-            weather_risk * 0.20 +
-            traffic_risk * 0.15 +
+            base_risk * 0.34 +
+            weather_risk * 0.18 +
+            traffic_risk * 0.14 +
             incident_risk * 0.10 +
-            historical_risk * 0.15
+            historical_risk * 0.12 +
+            demographic_risk * 0.12
         )
         
         # Apply multipliers
@@ -166,7 +194,11 @@ class RiskAgent:
         risk_factors = self._identify_risk_factors(
             base_risk, weather_risk, traffic_risk, incident_risk, historical_risk
         )
+        if demographic_risk >= 0.55:
+            risk_factors.append("Rider segment exposure is elevated")
         recommendations = self._generate_recommendations(risk_factors, final_risk)
+        recommendations.extend(self._generate_segment_recommendations(segment_summary))
+        recommendations = list(dict.fromkeys(recommendations))
         
         assessment = RiskAssessment(
             rider_id=rider_id,
@@ -175,10 +207,12 @@ class RiskAgent:
             weather_risk=round(weather_risk, 3),
             traffic_risk=round(traffic_risk, 3),
             incident_risk=round(incident_risk, 3),
+            demographic_risk=round(demographic_risk, 3),
             historical_risk=round(historical_risk, 3),
             final_risk_score=round(final_risk, 3),
             risk_factors=risk_factors,
             recommendations=recommendations,
+            segment_summary=segment_summary,
             assessed_at=now
         )
         
@@ -198,6 +232,7 @@ class RiskAgent:
         state: str,
         country: str,
         claim_history: List[Dict] = None,
+        rider_profile: Optional[Dict] = None,
     ) -> RiskAssessment:
         """
         Delivery-specific risk that blends local zone and macro regional conditions.
@@ -210,6 +245,7 @@ class RiskAgent:
             lat=delivery_lat,
             lon=delivery_lon,
             claim_history=claim_history or [],
+            rider_profile=rider_profile or {},
         )
 
         macro = await news_service.get_macro_incident_score(
@@ -242,12 +278,57 @@ class RiskAgent:
             weather_risk=base_assessment.weather_risk,
             traffic_risk=base_assessment.traffic_risk,
             incident_risk=max(base_assessment.incident_risk, round(macro_risk, 3)),
+            demographic_risk=base_assessment.demographic_risk,
             historical_risk=base_assessment.historical_risk,
             final_risk_score=round(delivery_weighted, 3),
             risk_factors=factors,
             recommendations=recommendations,
+            segment_summary=base_assessment.segment_summary,
             assessed_at=datetime.utcnow(),
         )
+
+    def _calculate_demographic_risk(self, rider_profile: Dict) -> Tuple[float, List[str]]:
+        age_band = (rider_profile.get("age_band") or "").lower()
+        vehicle_type = (rider_profile.get("vehicle_type") or "").lower()
+        shift_type = (rider_profile.get("shift_type") or "").lower()
+        tenure_months = int(rider_profile.get("tenure_months") or 0)
+
+        age_factor = AGE_BAND_RISK_FACTOR.get(age_band, 1.0)
+        vehicle_factor = VEHICLE_RISK_FACTOR.get(vehicle_type, 1.0)
+        shift_factor = SHIFT_RISK_FACTOR.get(shift_type, 1.0)
+
+        if tenure_months <= 3:
+            tenure_factor = 1.10
+        elif tenure_months <= 12:
+            tenure_factor = 1.03
+        elif tenure_months >= 36:
+            tenure_factor = 0.95
+        else:
+            tenure_factor = 1.0
+
+        combined = min(1.0, max(0.0, ((age_factor + vehicle_factor + shift_factor + tenure_factor) / 4) - 0.2))
+
+        segments: List[str] = []
+        if age_band:
+            segments.append(f"Age band: {age_band}")
+        if vehicle_type:
+            segments.append(f"Vehicle: {vehicle_type}")
+        if shift_type:
+            segments.append(f"Shift: {shift_type}")
+        segments.append(f"Tenure: {tenure_months} months")
+
+        return combined, segments
+
+    def _generate_segment_recommendations(self, segment_summary: List[str]) -> List[str]:
+        recommendations: List[str] = []
+        summary_text = " ".join(segment_summary).lower()
+        if "late_night" in summary_text:
+            recommendations.append("Late-night riders should avoid isolated delivery corridors when disruption signals spike.")
+        if "ev_scooter" in summary_text:
+            recommendations.append("EV riders should watch charging coverage and avoid long detours during surge drops.")
+        if "tenure: 0 months" in summary_text or "tenure: 1 months" in summary_text or "tenure: 2 months" in summary_text:
+            recommendations.append("New riders should prefer familiar delivery clusters until route confidence improves.")
+        return recommendations
     
     async def assess_zone_risk(self, zone_id: str) -> Dict:
         """

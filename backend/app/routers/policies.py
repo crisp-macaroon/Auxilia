@@ -322,7 +322,13 @@ async def calculate_premium(
             zone_id=zone_id,
             persona=persona,
             lat=rider.latitude,
-            lon=rider.longitude
+            lon=rider.longitude,
+            rider_profile={
+                "age_band": rider.age_band,
+                "vehicle_type": rider.vehicle_type,
+                "shift_type": rider.shift_type,
+                "tenure_months": rider.tenure_months,
+            },
         )
         risk_factor = risk_agent.calculate_premium_multiplier(assessment.final_risk_score)
     else:

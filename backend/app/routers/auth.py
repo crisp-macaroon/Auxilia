@@ -49,6 +49,12 @@ async def rider_register(payload: RiderRegisterRequest, db: AsyncSession = Depen
         lat=payload.latitude,
         lon=payload.longitude,
         claim_history=[],
+        rider_profile={
+            "age_band": payload.age_band,
+            "vehicle_type": payload.vehicle_type,
+            "shift_type": payload.shift_type,
+            "tenure_months": payload.tenure_months,
+        },
     )
 
     rider = Rider(
@@ -59,6 +65,10 @@ async def rider_register(payload: RiderRegisterRequest, db: AsyncSession = Depen
         email=payload.email,
         persona=payload.persona.value,
         zone_id=payload.zone_id,
+        age_band=payload.age_band,
+        vehicle_type=payload.vehicle_type,
+        shift_type=payload.shift_type,
+        tenure_months=payload.tenure_months,
         latitude=payload.latitude,
         longitude=payload.longitude,
         risk_score=risk_assessment.final_risk_score,

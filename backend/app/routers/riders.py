@@ -25,6 +25,15 @@ from app.core.security import require_admin
 router = APIRouter(prefix="/riders", tags=["Riders"])
 
 
+def _build_rider_profile(rider: Rider | RiderCreate | RiderUpdate) -> dict:
+    return {
+        "age_band": getattr(rider, "age_band", None),
+        "vehicle_type": getattr(rider, "vehicle_type", None),
+        "shift_type": getattr(rider, "shift_type", None),
+        "tenure_months": getattr(rider, "tenure_months", 0) or 0,
+    }
+
+
 @router.post("/", response_model=RiderResponse)
 async def create_rider(
     rider: RiderCreate,
@@ -45,7 +54,8 @@ async def create_rider(
         persona=rider.persona,
         lat=rider.latitude if rider.latitude is not None else None,
         lon=rider.longitude if rider.longitude is not None else None,
-        claim_history=[]
+        claim_history=[],
+        rider_profile=_build_rider_profile(rider),
     )
     
     db_rider = Rider(
@@ -55,6 +65,10 @@ async def create_rider(
         email=rider.email,
         persona=rider.persona.value,
         zone_id=rider.zone_id,
+        age_band=rider.age_band,
+        vehicle_type=rider.vehicle_type,
+        shift_type=rider.shift_type,
+        tenure_months=rider.tenure_months,
         latitude=rider.latitude,
         longitude=rider.longitude,
         risk_score=risk_assessment.final_risk_score,
@@ -143,7 +157,8 @@ async def update_rider(
             zone_id=update.zone_id,
             persona=PersonaType(rider.persona),
             lat=rider.latitude,
-            lon=rider.longitude
+            lon=rider.longitude,
+            rider_profile=_build_rider_profile(rider),
         )
         rider.risk_score = risk_assessment.final_risk_score
     
@@ -190,7 +205,8 @@ async def get_rider_risk(
         persona=PersonaType(rider.persona),
         lat=rider.latitude,
         lon=rider.longitude,
-        claim_history=claim_history
+        claim_history=claim_history,
+        rider_profile=_build_rider_profile(rider),
     )
     
     return {
@@ -349,6 +365,7 @@ async def delivery_checkin(
         state=state,
         country=country,
         claim_history=[],
+        rider_profile=_build_rider_profile(rider),
     )
 
     nearby_result = await db.execute(select(Rider).where(Rider.status == RiderStatus.ACTIVE.value))

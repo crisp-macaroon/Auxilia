@@ -44,6 +44,10 @@ class RiderCreate(BaseModel):
     email: Optional[str] = None
     persona: PersonaType
     zone_id: str
+    age_band: Optional[str] = None
+    vehicle_type: Optional[str] = None
+    shift_type: Optional[str] = None
+    tenure_months: int = 0
     latitude: Optional[float] = None
     longitude: Optional[float] = None
 
@@ -53,6 +57,10 @@ class RiderUpdate(BaseModel):
     email: Optional[str] = None
     persona: Optional[PersonaType] = None
     zone_id: Optional[str] = None
+    age_band: Optional[str] = None
+    vehicle_type: Optional[str] = None
+    shift_type: Optional[str] = None
+    tenure_months: Optional[int] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     status: Optional[RiderStatus] = None
@@ -65,6 +73,10 @@ class RiderResponse(BaseModel):
     email: Optional[str]
     persona: PersonaType
     zone_id: str
+    age_band: Optional[str]
+    vehicle_type: Optional[str]
+    shift_type: Optional[str]
+    tenure_months: int = 0
     latitude: Optional[float]
     longitude: Optional[float]
     risk_score: float
@@ -365,10 +377,12 @@ class RiskAssessment(BaseModel):
     weather_risk: float = 0.0
     traffic_risk: float = 0.0
     incident_risk: float = 0.0
+    demographic_risk: float = 0.0
     historical_risk: float = 0.0
     final_risk_score: float
     risk_factors: List[str] = []
     recommendations: List[str] = []
+    segment_summary: List[str] = []
     assessed_at: datetime
 
 
@@ -536,6 +550,10 @@ class RiderRegisterRequest(BaseModel):
     email: Optional[str] = None
     persona: PersonaType
     zone_id: str
+    age_band: Optional[str] = None
+    vehicle_type: Optional[str] = None
+    shift_type: Optional[str] = None
+    tenure_months: int = 0
     latitude: Optional[float] = None
     longitude: Optional[float] = None
 

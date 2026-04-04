@@ -37,11 +37,19 @@ logger = logging.getLogger(__name__)
 
 async def ensure_rider_auth_columns() -> None:
     async with engine.begin() as conn:
-        try:
-            await conn.exec_driver_sql("ALTER TABLE riders ADD COLUMN password_hash VARCHAR(255)")
-            logger.info("Added riders.password_hash column")
-        except Exception:
-            pass
+        statements = [
+            ("password_hash", "ALTER TABLE riders ADD COLUMN password_hash VARCHAR(255)"),
+            ("age_band", "ALTER TABLE riders ADD COLUMN age_band VARCHAR(30)"),
+            ("vehicle_type", "ALTER TABLE riders ADD COLUMN vehicle_type VARCHAR(30)"),
+            ("shift_type", "ALTER TABLE riders ADD COLUMN shift_type VARCHAR(30)"),
+            ("tenure_months", "ALTER TABLE riders ADD COLUMN tenure_months INTEGER DEFAULT 0"),
+        ]
+        for column_name, statement in statements:
+            try:
+                await conn.exec_driver_sql(statement)
+                logger.info("Added riders.%s column", column_name)
+            except Exception:
+                pass
 
 
 @asynccontextmanager
