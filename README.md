@@ -106,9 +106,79 @@ cd backend
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
+python scripts/train_ml_models.py
 cp ../.env.sample .env
 python seed.py
 uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+On Windows PowerShell, activate with `venv\Scripts\Activate.ps1`.
+
+The training step creates:
+
+- `backend/ml/risk_model.pkl` and `backend/ml/risk_model_meta.json`
+- `backend/ml/premium_model.pkl` and `backend/ml/premium_model_meta.json`
+- `backend/ml/fraud_model.pkl` and `backend/ml/fraud_model_meta.json`
+
+If these model artifacts are missing, backend services auto-train baseline models on startup so risk and premium calculations still run in ML mode.
+
+### ML checkpoints and verification
+
+Run these commands from `backend/`:
+
+```bash
+# train/refresh all models
+python scripts/train_ml_models.py
+
+# quick inference smoke checks for risk/premium/fraud (offline, no external APIs)
+python scripts/check_ml_models.py
+
+# optional live-mode check with weather/news/traffic APIs
+python scripts/check_ml_models.py --live
+```
+
+For manual checkpoints, inspect model metadata files:
+
+- `backend/ml/risk_model_meta.json`
+- `backend/ml/premium_model_meta.json`
+- `backend/ml/fraud_model_meta.json`
+
+Each metadata file includes version, training timestamp, row count, and feature names.
+
+### Reviewer checklist (ML mapping)
+
+Use this checklist to confirm ML outputs are connected to business decisions:
+
+1. Train models:
+
+```bash
+python scripts/train_ml_models.py
+```
+
+2. Run offline inference check:
+
+```bash
+python scripts/check_ml_models.py
+```
+
+3. Confirm model artifacts exist:
+
+```bash
+ls ml
+```
+
+You should see `risk_model.pkl`, `premium_model.pkl`, and `fraud_model.pkl` (plus their `*_meta.json`).
+
+4. Confirm where each model is used in runtime:
+
+- Risk model output -> `RiskAssessment.final_risk_score` for rider/zone risk (`backend/app/agents/risk_agent.py`)
+- Premium model output -> `premium_multiplier` and `final_premium` quote result (`backend/app/routers/policies.py`)
+- Fraud model output -> `fraud_score`/`fraud_probability` and claim verification path (`backend/app/agents/fraud_agent.py`, `backend/app/routers/claims.py`)
+
+5. Optional live external-data validation (requires valid API keys):
+
+```bash
+python scripts/check_ml_models.py --live
 ```
 
 Backend docs: `http://localhost:8000/docs`

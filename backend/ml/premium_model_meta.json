@@ -1,0 +1,21 @@
+{
+  "model_name": "premium-random-forest",
+  "version": "premium-rf-v1",
+  "trained_at": "2026-04-15T17:38:15.223067",
+  "train_rows": 18000,
+  "feature_names": [
+    "zone_hash",
+    "zone_factor",
+    "zone_base_risk",
+    "risk_score",
+    "weather_risk",
+    "traffic_risk",
+    "incident_risk",
+    "historical_risk",
+    "persona_num",
+    "month_sin",
+    "month_cos",
+    "hour_sin",
+    "hour_cos"
+  ]
+}

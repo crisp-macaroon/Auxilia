@@ -1,0 +1,21 @@
+{
+  "model_name": "risk-gradient-boosting",
+  "version": "risk-gbm-v1",
+  "trained_at": "2026-04-15T17:38:11.971852",
+  "train_rows": 15000,
+  "feature_names": [
+    "zone_hash",
+    "zone_base_risk",
+    "weather_risk",
+    "traffic_risk",
+    "incident_risk",
+    "historical_risk",
+    "persona_num",
+    "age_num",
+    "vehicle_num",
+    "shift_num",
+    "tenure_num",
+    "month_sin",
+    "month_cos"
+  ]
+}

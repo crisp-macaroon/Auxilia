@@ -1,13 +1,12 @@
 """
 RiskAgent - Dynamic risk scoring for riders and zones
-Uses ML model + real-time data for premium calculation
+Uses real ML models + live data for premium calculation
 """
 import asyncio
 import logging
-import numpy as np
 from datetime import datetime
 from typing import Dict, Optional, List, Tuple
-from pathlib import Path
+
 from app.core.config import settings
 from app.services.weather_service import weather_service
 from app.services.traffic_service import traffic_service
@@ -109,21 +108,31 @@ class RiskAgent:
     """
     
     def __init__(self):
-        self.model = None
         self._risk_cache: Dict[str, RiskAssessment] = {}
-        self._load_model()
-    
-    def _load_model(self):
-        """Load ML model if available."""
-        model_path = Path(__file__).parent.parent.parent / "ml" / "risk_model.pkl"
-        if model_path.exists():
-            try:
-                import joblib
-                self.model = joblib.load(model_path)
-                logger.info("Risk ML model loaded successfully")
-            except Exception as e:
-                logger.warning(f"Could not load ML model: {e}")
-                self.model = None
+
+    @staticmethod
+    def _fallback_ml_risk(
+        base_risk: float,
+        weather_risk: float,
+        traffic_risk: float,
+        incident_risk: float,
+        historical_risk: float,
+        demographic_risk: float,
+    ) -> float:
+        return min(
+            0.99,
+            max(
+                0.01,
+                (
+                    base_risk * 0.35
+                    + weather_risk * 0.2
+                    + traffic_risk * 0.15
+                    + incident_risk * 0.1
+                    + historical_risk * 0.1
+                    + demographic_risk * 0.1
+                ),
+            ),
+        )
     
     async def assess_rider_risk(
         self,
@@ -132,7 +141,7 @@ class RiskAgent:
         persona: PersonaType,
         lat: Optional[float] = None,
         lon: Optional[float] = None,
-        claim_history: List[Dict] = None,
+        claim_history: Optional[List[Dict]] = None,
         rider_profile: Optional[Dict] = None,
     ) -> RiskAssessment:
         """
@@ -148,17 +157,14 @@ class RiskAgent:
             return 0.0
 
         # Get real-time risk factors in parallel
-        weather_risk, traffic_risk, incident_risk = await asyncio.gather(
+        weather_risk_raw, traffic_risk_raw, incident_risk_raw = await asyncio.gather(
             self._get_weather_risk(lat, lon) if lat and lon else _zero(),
             self._get_traffic_risk(lat, lon) if lat and lon else _zero(),
             self._get_incident_risk(zone_id),
-            return_exceptions=True
         )
-        
-        # Handle exceptions
-        weather_risk = weather_risk if not isinstance(weather_risk, Exception) else 0.0
-        traffic_risk = traffic_risk if not isinstance(traffic_risk, Exception) else 0.0
-        incident_risk = incident_risk if not isinstance(incident_risk, Exception) else 0.0
+        weather_risk = float(weather_risk_raw)
+        traffic_risk = float(traffic_risk_raw)
+        incident_risk = float(incident_risk_raw)
         
         # Calculate historical risk from claims
         historical_risk = self._calculate_historical_risk(claim_history or [])
@@ -166,29 +172,47 @@ class RiskAgent:
             rider_profile or {}
         )
         
-        # Apply persona factor
-        persona_factor = PERSONA_RISK_FACTOR.get(persona, 1.0)
-        
-        # Apply seasonal factor
         month = now.month
+
+        age_band = (rider_profile or {}).get("age_band")
+        vehicle_type = (rider_profile or {}).get("vehicle_type")
+        shift_type = (rider_profile or {}).get("shift_type")
+        tenure_months = (rider_profile or {}).get("tenure_months")
+
+        risk_model_version = "fallback-v1"
+        try:
+            from app.services.ml_service import risk_ml_service
+
+            ml_risk = risk_ml_service.predict_risk_score(
+                zone_id=zone_id,
+                zone_base_risk=base_risk,
+                weather_risk=weather_risk,
+                traffic_risk=traffic_risk,
+                incident_risk=incident_risk,
+                historical_risk=historical_risk,
+                persona=persona,
+                age_band=age_band,
+                vehicle_type=vehicle_type,
+                shift_type=shift_type,
+                tenure_months=tenure_months,
+                month=month,
+            )
+            risk_model_version = risk_ml_service.model_version
+        except Exception:
+            ml_risk = self._fallback_ml_risk(
+                base_risk,
+                weather_risk,
+                traffic_risk,
+                incident_risk,
+                historical_risk,
+                demographic_risk,
+            )
+
+        # Keep a lightweight calibration against seasonal + persona prior
+        persona_factor = PERSONA_RISK_FACTOR.get(persona, 1.0)
         seasonal_factor = MONTHLY_RISK_FACTOR.get(month, 1.0)
-        
-        # Combine risk factors
-        # Weighted combination: base(34%) + weather(18%) + traffic(14%) + incidents(10%) + history(12%) + demographics(12%)
-        combined_risk = (
-            base_risk * 0.34 +
-            weather_risk * 0.18 +
-            traffic_risk * 0.14 +
-            incident_risk * 0.10 +
-            historical_risk * 0.12 +
-            demographic_risk * 0.12
-        )
-        
-        # Apply multipliers
-        final_risk = combined_risk * persona_factor * seasonal_factor
-        
-        # Clamp to 0-1 range
-        final_risk = max(0.0, min(1.0, final_risk))
+        prior_adjustment = min(1.15, max(0.88, (persona_factor * seasonal_factor) ** 0.20))
+        final_risk = max(0.0, min(1.0, ml_risk * prior_adjustment))
         
         # Generate risk factors and recommendations
         risk_factors = self._identify_risk_factors(
@@ -210,6 +234,7 @@ class RiskAgent:
             demographic_risk=round(demographic_risk, 3),
             historical_risk=round(historical_risk, 3),
             final_risk_score=round(final_risk, 3),
+            ml_model_version=risk_model_version,
             risk_factors=risk_factors,
             recommendations=recommendations,
             segment_summary=segment_summary,
@@ -231,7 +256,7 @@ class RiskAgent:
         city: str,
         state: str,
         country: str,
-        claim_history: List[Dict] = None,
+        claim_history: Optional[List[Dict]] = None,
         rider_profile: Optional[Dict] = None,
     ) -> RiskAssessment:
         """
@@ -343,23 +368,43 @@ class RiskAgent:
         lat = zone.get("lat", 0)
         lon = zone.get("lon", 0)
         
-        weather_risk, traffic_risk, incident_risk = await asyncio.gather(
+        weather_risk_raw, traffic_risk_raw, incident_risk_raw = await asyncio.gather(
             self._get_weather_risk(lat, lon),
             self._get_traffic_risk(lat, lon),
             self._get_incident_risk(zone_id),
-            return_exceptions=True
         )
+        weather_risk = float(weather_risk_raw)
+        traffic_risk = float(traffic_risk_raw)
+        incident_risk = float(incident_risk_raw)
         
-        weather_risk = weather_risk if not isinstance(weather_risk, Exception) else 0.0
-        traffic_risk = traffic_risk if not isinstance(traffic_risk, Exception) else 0.0
-        incident_risk = incident_risk if not isinstance(incident_risk, Exception) else 0.0
-        
-        combined_risk = (
-            base_risk * 0.50 +
-            weather_risk * 0.25 +
-            traffic_risk * 0.15 +
-            incident_risk * 0.10
-        )
+        risk_model_version = "fallback-v1"
+        try:
+            from app.services.ml_service import risk_ml_service
+
+            combined_risk = risk_ml_service.predict_risk_score(
+                zone_id=zone_id,
+                zone_base_risk=base_risk,
+                weather_risk=weather_risk,
+                traffic_risk=traffic_risk,
+                incident_risk=incident_risk,
+                historical_risk=0.2,
+                persona=PersonaType.FOOD_DELIVERY,
+                age_band="26-35",
+                vehicle_type="scooter",
+                shift_type="mixed",
+                tenure_months=18,
+                month=datetime.utcnow().month,
+            )
+            risk_model_version = risk_ml_service.model_version
+        except Exception:
+            combined_risk = self._fallback_ml_risk(
+                base_risk,
+                weather_risk,
+                traffic_risk,
+                incident_risk,
+                0.2,
+                0.35,
+            )
         
         return {
             "zone_id": zone_id,
@@ -371,6 +416,7 @@ class RiskAgent:
             "combined_risk": round(combined_risk, 3),
             "risk_level": self._risk_to_level(combined_risk),
             "premium_multiplier": self.calculate_premium_multiplier(combined_risk),
+            "risk_model_version": risk_model_version,
             "assessed_at": datetime.utcnow().isoformat()
         }
     

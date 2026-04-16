@@ -64,6 +64,10 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# ML artifacts
+backend/ml/*.pkl
+backend/ml/*.joblib
+
 # Misc
 .cache/
 tmp/

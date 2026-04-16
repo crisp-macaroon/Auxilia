@@ -9,6 +9,7 @@ from typing import Dict, List, Tuple, Optional, Any
 from app.core.config import settings
 from app.models.schemas import FraudAssessment, ClaimStatus
 from app.services.location_service import location_service
+from app.services.ml_service import fraud_ml_service
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +95,7 @@ class FraudAgent:
             risk_flags.append("Behavioral anomaly detected")
         
         # Calculate fraud score
-        fraud_score = self._calculate_fraud_score(check_results)
+        fraud_score, ml_confidence, model_version = self._calculate_fraud_score(check_results)
         
         # Determine verification status
         if fraud_score >= AUTO_REJECT_THRESHOLD:
@@ -113,9 +114,9 @@ class FraudAgent:
             fraud_probability=round(fraud_score, 3),
             risk_flags=risk_flags,
             verification_status=status,
-            ml_confidence=0.85,  # Would come from ML model
+            ml_confidence=round(ml_confidence, 3),
             manual_review_required=fraud_score >= FRAUD_SCORE_THRESHOLD,
-            assessment_details=check_results,
+            assessment_details={**check_results, "fraud_model_version": model_version},
             assessed_at=now
         )
         
@@ -325,25 +326,39 @@ class FraudAgent:
         
         return is_normal, details
     
-    def _calculate_fraud_score(self, check_results: Dict) -> float:
+    def _calculate_fraud_score(self, check_results: Dict) -> Tuple[float, float, str]:
         """
         Calculate overall fraud score from check results.
         """
-        weights = {
-            "location": 0.25,
-            "duplicate": 0.30,
-            "frequency": 0.20,
-            "trigger": 0.15,
-            "behavior": 0.10
+        feature_payload = {
+            "location_fail": 0.0 if check_results.get("location", {}).get("passed", True) else 1.0,
+            "duplicate_fail": 0.0 if check_results.get("duplicate", {}).get("passed", True) else 1.0,
+            "frequency_fail": 0.0 if check_results.get("frequency", {}).get("passed", True) else 1.0,
+            "trigger_fail": 0.0 if check_results.get("trigger", {}).get("passed", True) else 1.0,
+            "behavior_fail": 0.0 if check_results.get("behavior", {}).get("passed", True) else 1.0,
+            "distance_km": float(check_results.get("location", {}).get("details", {}).get("distance_meters", 0.0) or 0.0) / 1000.0,
+            "recent_same_claims": float(check_results.get("duplicate", {}).get("details", {}).get("recent_same_claims", 0.0) or 0.0),
+            "claims_last_7_days": float(check_results.get("frequency", {}).get("details", {}).get("claims_last_7_days", 0.0) or 0.0),
+            "anomaly_score": float(check_results.get("behavior", {}).get("details", {}).get("anomaly_score", 0.0) or 0.0),
+            "high_rejection_rate": 1.0 if check_results.get("behavior", {}).get("details", {}).get("high_rejection_rate") else 0.0,
+            "same_hour_pattern": 1.0 if check_results.get("behavior", {}).get("details", {}).get("same_hour_pattern") else 0.0,
+            "same_day_pattern": 1.0 if check_results.get("behavior", {}).get("details", {}).get("same_day_pattern") else 0.0,
+            "trigger_found": 1.0 if check_results.get("trigger", {}).get("details", {}).get("trigger_found", True) else 0.0,
         }
-        
-        score = 0.0
-        for check, weight in weights.items():
-            if check in check_results:
-                if not check_results[check]["passed"]:
-                    score += weight
-        
-        return score
+
+        try:
+            fraud_prob, confidence = fraud_ml_service.predict_fraud_probability(feature_payload)
+            return fraud_prob, confidence, fraud_ml_service.model_version
+        except Exception:
+            # deterministic fallback if model unavailable
+            fallback_score = (
+                feature_payload["location_fail"] * 0.25
+                + feature_payload["duplicate_fail"] * 0.30
+                + feature_payload["frequency_fail"] * 0.20
+                + feature_payload["trigger_fail"] * 0.15
+                + feature_payload["behavior_fail"] * 0.10
+            )
+            return min(1.0, fallback_score), 0.5, "fallback-v1"
     
     async def quick_validate(
         self,

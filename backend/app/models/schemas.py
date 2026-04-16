@@ -380,6 +380,7 @@ class RiskAssessment(BaseModel):
     demographic_risk: float = 0.0
     historical_risk: float = 0.0
     final_risk_score: float
+    ml_model_version: Optional[str] = None
     risk_factors: List[str] = []
     recommendations: List[str] = []
     segment_summary: List[str] = []
@@ -527,6 +528,8 @@ class PremiumCalculation(BaseModel):
     persona_factor: float
     risk_factor: float
     weekly_adjustment: float = 0.0
+    premium_multiplier: float = 1.0
+    premium_model_version: Optional[str] = None
     final_premium: float
     coverage: float
     recommended_coverage_hours: int = 0
