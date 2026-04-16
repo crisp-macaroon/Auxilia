@@ -1,0 +1,16 @@
+.git
+.github
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+auxilia.db
+*.db
+ml/*.pkl
+node_modules/
