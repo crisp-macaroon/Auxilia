@@ -1,115 +1,69 @@
-import {
-  FileText,
-  ClipboardList,
-  Users,
-  IndianRupee,
-  TrendingUp,
-  AlertTriangle,
-} from 'lucide-react';
-import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
+import Link from 'next/link';
+import { ArrowRight, Bike, Shield, UserCog } from 'lucide-react';
 
-import { StatCard, ClaimsChart, LiveTriggers, RecentClaims, ZoneDistribution, ZoneHeatmap, ZoneMap } from '@/components/dashboard';
-import {
-  getClaimsChart,
-  getDashboardStats,
-  getLiveTriggers,
-  getRecentClaims,
-  getZoneHeatmap,
-  getZoneStats,
-} from '@/lib/api';
-import { ADMIN_TOKEN_COOKIE, hasAdminToken } from '@/lib/auth';
-import { formatCurrency } from '@/lib/utils';
-
-export default async function DashboardPage() {
-  const cookieStore = await cookies();
-  const adminToken = cookieStore.get(ADMIN_TOKEN_COOKIE)?.value;
-
-  if (!hasAdminToken(adminToken)) {
-    redirect('/login');
-  }
-
-  const [stats, claimsChart, recentClaims, liveTriggers, zoneStats, zoneHeatmap] = await Promise.all([
-    getDashboardStats(),
-    getClaimsChart(),
-    getRecentClaims(8),
-    getLiveTriggers(),
-    getZoneStats(),
-    getZoneHeatmap(),
-  ]);
-
-  const chartData = claimsChart.data.map((item) => ({
-    name: item.date ? new Date(item.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }) : 'N/A',
-    claims: item.total,
-    approved: item.approved,
-    rejected: item.rejected,
-  }));
-
-  const zoneData = zoneStats.zones
-    .filter((zone) => zone.active_policies > 0 || zone.total_claims > 0 || zone.total_payouts > 0)
-    .map((zone) => ({
-      name: zone.name,
-      value: zone.active_policies,
-      risk: zone.risk_level === 'very_high' ? 'high' : zone.risk_level === 'high' ? 'high' : zone.risk_level === 'low' ? 'low' : 'medium',
-    }));
-
+export default function RoleGatewayPage() {
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-        <p className="text-slate-500">Live platform metrics from the Auxilia backend.</p>
-      </div>
+    <div className="relative min-h-[calc(100vh-4rem)] overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(249,115,22,0.16),_transparent_42%),linear-gradient(120deg,#fff7ed_0%,#ffffff_58%,#ecfeff_100%)] px-6 py-10">
+      <div className="absolute -left-24 top-6 h-72 w-72 rounded-full bg-orange-200/35 blur-3xl" />
+      <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-cyan-200/35 blur-3xl" />
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Active Policies" value={String(stats.active_policies)} change={`${stats.total_policies} total policies`} changeType="positive" icon={FileText} iconColor="text-blue-600" iconBg="bg-blue-100" />
-        <StatCard title="Total Claims" value={String(stats.total_claims)} change={`${stats.pending_claims} pending review`} changeType="positive" icon={ClipboardList} iconColor="text-orange-600" iconBg="bg-orange-100" />
-        <StatCard title="Active Riders" value={String(stats.active_riders)} change={`Avg risk ${stats.avg_risk_score.toFixed(2)}`} changeType="positive" icon={Users} iconColor="text-teal-600" iconBg="bg-teal-100" />
-        <StatCard title="Premium Collected" value={formatCurrency(stats.total_premium_collected)} change={`Loss ratio ${stats.loss_ratio.toFixed(1)}%`} changeType="positive" icon={IndianRupee} iconColor="text-green-600" iconBg="bg-green-100" />
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Claims Paid" value={formatCurrency(stats.total_claims_paid)} change="Approved payout volume" changeType="neutral" icon={TrendingUp} iconColor="text-purple-600" iconBg="bg-purple-100" />
-        <StatCard title="Pending Claims" value={String(stats.pending_claims)} change="Needs processing" changeType="neutral" icon={ClipboardList} iconColor="text-yellow-600" iconBg="bg-yellow-100" />
-        <StatCard title="Active Triggers" value={String(stats.active_triggers)} change={stats.active_triggers > 0 ? 'Live alerts in monitored zones' : 'No live alerts'} changeType={stats.active_triggers > 0 ? 'negative' : 'neutral'} icon={AlertTriangle} iconColor="text-red-600" iconBg="bg-red-100" />
-        <StatCard title="Avg Risk Score" value={stats.avg_risk_score.toFixed(2)} change="Portfolio-wide rider risk" changeType="neutral" icon={TrendingUp} iconColor="text-slate-600" iconBg="bg-slate-100" />
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <ClaimsChart data={chartData} />
+      <div className="relative mx-auto max-w-5xl">
+        <div className="mb-8 flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 shadow-lg">
+            <Shield className="h-6 w-6 text-white" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-500">Auxilia</p>
+            <h1 className="text-3xl font-semibold text-slate-900">Choose your entry</h1>
+          </div>
         </div>
-        <div>
-          <ZoneDistribution data={zoneData} />
-        </div>
-      </div>
 
-      <ZoneHeatmap points={zoneHeatmap.points} />
-      <ZoneMap points={zoneHeatmap.points} />
+        <div className="grid gap-6 md:grid-cols-2">
+          <div className="rounded-3xl border border-white/70 bg-white/90 p-7 shadow-xl backdrop-blur">
+            <div className="mb-4 inline-flex rounded-xl bg-orange-50 p-3 text-orange-600">
+              <Bike className="h-6 w-6" />
+            </div>
+            <h2 className="text-xl font-semibold text-slate-900">I am a rider</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Use the Auxilia Rider App for onboarding, policy activation, route risk tracking, and claim visibility.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <a
+                href="https://github.com/crisp-macaroon/Auxilia/releases"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 rounded-2xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-600"
+              >
+                Download Rider APK <ArrowRight className="h-4 w-4" />
+              </a>
+              <a
+                href="https://github.com/crisp-macaroon/Auxilia/releases"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                View release notes
+              </a>
+            </div>
+          </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <RecentClaims
-            claims={recentClaims.claims.map((claim) => ({
-              id: claim.id,
-              rider: claim.rider_name,
-              type: claim.trigger_type,
-              amount: claim.amount,
-              status: claim.status,
-              time: claim.created_at,
-              zone: claim.zone_id,
-            }))}
-          />
-        </div>
-        <div>
-          <LiveTriggers
-            triggers={liveTriggers.triggers.map((trigger) => ({
-              zone: trigger.zone_name,
-              type: trigger.trigger_type,
-              current: trigger.current_value,
-              threshold: trigger.threshold,
-              isActive: trigger.current_value >= trigger.threshold,
-            }))}
-          />
+          <div className="rounded-3xl border border-white/70 bg-white/90 p-7 shadow-xl backdrop-blur">
+            <div className="mb-4 inline-flex rounded-xl bg-cyan-50 p-3 text-cyan-700">
+              <UserCog className="h-6 w-6" />
+            </div>
+            <h2 className="text-xl font-semibold text-slate-900">I am admin / operations</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Continue to the dashboard for rider monitoring, triggers, claims processing, and payout operations.
+            </p>
+            <div className="mt-6">
+              <Link
+                href="/login"
+                className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+              >
+                Continue to admin login <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     </div>

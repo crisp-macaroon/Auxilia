@@ -10,7 +10,7 @@ export const DEPLOYMENT_PIPELINE_VERSION = '2026-03-20-reinit';
 
 // Navigation Items
 export const NAV_ITEMS = [
-  { name: 'Dashboard', href: '/', icon: 'LayoutDashboard' },
+  { name: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard' },
   { name: 'Policies', href: '/policies', icon: 'FileText' },
   { name: 'Claims', href: '/claims', icon: 'ClipboardList' },
   { name: 'Riders', href: '/riders', icon: 'Users' },

@@ -8,8 +8,9 @@ import { Sidebar } from '@/components/layout/Sidebar';
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isLoginPage = pathname === '/login';
+  const isGatewayPage = pathname === '/';
 
-  if (isLoginPage) {
+  if (isLoginPage || isGatewayPage) {
     return <main className="min-h-screen w-full bg-white">{children}</main>;
   }
 
