@@ -109,6 +109,18 @@ def _recommended_coverage_hours(
     return BASE_COVERAGE_HOURS.get(persona, 48) + extra_hours
 
 
+def _resolve_duration_factor(duration_days: int) -> float:
+    if duration_days >= 28:
+        return 0.85
+    if duration_days >= 21:
+        return 0.90
+    if duration_days >= 14:
+        return 0.95
+    if duration_days >= 7:
+        return 1.0
+    return 1.15
+
+
 @router.post("/", response_model=PolicyResponse)
 async def create_policy(
     policy: PolicyCreate,
@@ -445,18 +457,7 @@ async def calculate_premium(
     else:
         risk_factor = 1.0
     
-    # Duration factor (weekly model - longer commitments get discount)
-    # Standard is 7 days (1 week), discounts for multi-week
-    if duration_days >= 28:  # 4+ weeks
-        duration_factor = 0.85
-    elif duration_days >= 21:  # 3 weeks
-        duration_factor = 0.9
-    elif duration_days >= 14:  # 2 weeks
-        duration_factor = 0.95
-    elif duration_days >= 7:  # 1 week (standard)
-        duration_factor = 1.0
-    else:
-        duration_factor = 1.15  # Less than a week costs more
+    duration_factor = _resolve_duration_factor(duration_days)
     
     if assessment is not None:
         weekly_adjustment, pricing_note = _calculate_weekly_adjustment(
@@ -478,9 +479,34 @@ async def calculate_premium(
         pricing_note = "Base weekly premium retained for balanced local risk"
         recommended_coverage_hours = BASE_COVERAGE_HOURS.get(persona, 48)
 
-    # Calculate final premium (fixed weekly base for rider-facing simplicity)
+    premium_model_version = "fallback-v1"
+    premium_multiplier = max(0.75, min(1.85, zone_factor * risk_factor))
+    if assessment is not None:
+        try:
+            from app.services.ml_service import premium_ml_service
+
+            now = datetime.utcnow()
+            premium_multiplier = premium_ml_service.predict_weekly_multiplier(
+                zone_id=zone_id,
+                zone_factor=zone_factor,
+                zone_base_risk=assessment.base_risk_score,
+                risk_score=assessment.final_risk_score,
+                weather_risk=assessment.weather_risk,
+                traffic_risk=assessment.traffic_risk,
+                incident_risk=assessment.incident_risk,
+                historical_risk=assessment.historical_risk,
+                persona=persona,
+                month=now.month,
+                hour=now.hour,
+            )
+            premium_model_version = premium_ml_service.model_version
+        except Exception:
+            premium_model_version = "fallback-v1"
+
+    weekly_premium = max(65.0, min(249.0, round(base_premium * premium_multiplier + weekly_adjustment, 2)))
+
+    # Calculate final premium with ML multiplier and duration factor
     weeks = max(1, duration_days / 7)
-    weekly_premium = base_premium
     final_premium = weekly_premium * duration_factor * weeks
     final_premium = round(final_premium, 2)
     
@@ -489,6 +515,8 @@ async def calculate_premium(
         "zone_factor": zone_factor,
         "persona_factor": 1.0,  # Already in base
         "risk_factor": risk_factor,
+        "premium_multiplier": round(premium_multiplier, 3),
+        "premium_model_version": premium_model_version,
         "weekly_adjustment": weekly_adjustment,
         "duration_factor": duration_factor,
         "duration_days": duration_days,
@@ -504,6 +532,8 @@ async def calculate_premium(
             "weather_risk": round(assessment.weather_risk, 3) if assessment else 0.0,
             "traffic_risk": round(assessment.traffic_risk, 3) if assessment else 0.0,
             "incident_risk": round(assessment.incident_risk, 3) if assessment else 0.0,
+            "risk_model_version": assessment.ml_model_version if assessment else None,
+            "premium_model_version": premium_model_version,
             "after_duration": final_premium
         }
     }
