@@ -50,7 +50,7 @@ export default async function DashboardPage() {
     .map((zone) => ({
       name: zone.name,
       value: zone.active_policies,
-      risk: zone.total_payouts > 1000 ? 'high' : zone.total_claims > 0 ? 'medium' : 'low',
+      risk: zone.risk_level === 'very_high' ? 'high' : zone.risk_level === 'high' ? 'high' : zone.risk_level === 'low' ? 'low' : 'medium',
     }));
 
   return (
