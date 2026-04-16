@@ -98,6 +98,7 @@ class RiderResponse(BaseModel):
     avg_hourly_income: float = Field(default=180.0, gt=0, le=5000)
     avg_daily_orders: int = Field(default=12, ge=1, le=200)
     avg_km_rate: float = Field(default=18.0, gt=0, le=500)
+    loyalty_points: int = 0
     latitude: Optional[float]
     longitude: Optional[float]
     risk_score: float
@@ -481,6 +482,7 @@ class PolicyPaymentOrderRequest(BaseModel):
     persona: Optional[PersonaType] = None
     duration_days: int = Field(default=7, ge=1, le=52)
     existing_policy_id: Optional[str] = None
+    points_to_redeem: int = Field(default=0, ge=0, le=10000)
 
 
 class PolicyPaymentOrderResponse(BaseModel):
@@ -494,6 +496,13 @@ class PolicyPaymentOrderResponse(BaseModel):
     persona: PersonaType
     duration_days: int
     premium: float
+    gst_amount: float = 0.0
+    gross_amount: float = 0.0
+    points_redeemed: int = 0
+    points_value: float = 0.0
+    net_payable: float = 0.0
+    loyalty_balance_after_redemption: int = 0
+    no_claim_loyalty_points_estimate: int = 0
     coverage: float
     flow_type: PaymentFlowType
     notes: dict = {}
@@ -510,6 +519,7 @@ class PolicyPaymentConfirmRequest(BaseModel):
     persona: Optional[PersonaType] = None
     duration_days: int = Field(default=7, ge=1, le=52)
     existing_policy_id: Optional[str] = None
+    points_to_redeem: int = Field(default=0, ge=0, le=10000)
 
 
 # Agent Schemas

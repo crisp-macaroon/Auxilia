@@ -32,6 +32,57 @@ TRIGGER_THRESHOLDS = {
 }
 
 
+@router.get("/public-payout-log")
+async def get_public_payout_log(
+    limit: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    """Public, anonymized payout log for transparency and trust."""
+    result = await db.execute(
+        select(Claim)
+        .where(Claim.status == ClaimStatus.PAID.value)
+        .order_by(Claim.processed_at.desc(), Claim.created_at.desc())
+        .limit(limit)
+    )
+    paid_claims = result.scalars().all()
+
+    rows = []
+    for claim in paid_claims:
+        rider_result = await db.execute(select(Rider).where(Rider.id == claim.rider_id))
+        rider = rider_result.scalar_one_or_none()
+
+        policy_result = await db.execute(select(Policy).where(Policy.id == claim.policy_id))
+        policy = policy_result.scalar_one_or_none()
+
+        zone_name = None
+        if policy:
+            zone_result = await db.execute(select(Zone).where(Zone.id == policy.zone_id))
+            zone = zone_result.scalar_one_or_none()
+            zone_name = zone.name if zone else policy.zone_id
+
+        masked_rider = "Rider"
+        if rider and rider.name:
+            masked_rider = f"{rider.name[0]}***"
+
+        rows.append({
+            "claim_id": claim.id,
+            "rider": masked_rider,
+            "trigger_type": claim.trigger_type,
+            "trigger_value": round(float(claim.trigger_value or 0.0), 2),
+            "threshold": round(float(claim.threshold or 0.0), 2),
+            "payout_amount": round(float(claim.amount or 0.0), 2),
+            "zone": zone_name,
+            "tx_hash": claim.tx_hash,
+            "processed_at": (claim.processed_at or claim.created_at).isoformat(),
+        })
+
+    return {
+        "count": len(rows),
+        "payouts": rows,
+        "note": "Anonymized parametric payout events with verifiable transaction hash.",
+    }
+
+
 @router.post("/", response_model=ClaimResponse)
 async def create_claim(
     claim: ClaimCreate,

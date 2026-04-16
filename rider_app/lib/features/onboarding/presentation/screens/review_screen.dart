@@ -18,6 +18,7 @@ class ReviewScreen extends ConsumerStatefulWidget {
 
 class _ReviewScreenState extends ConsumerState<ReviewScreen> {
   bool _isProcessing = false;
+  int _pointsToRedeem = 0;
   late final Razorpay _razorpay;
   Map<String, dynamic>? _pendingOrder;
   String? _pendingRiderId;
@@ -61,6 +62,7 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
       zoneId: onboarding.zoneId!,
       persona: onboarding.persona!,
       durationDays: 7,
+      pointsToRedeem: _pointsToRedeem,
     );
 
     if (!mounted) return;
@@ -119,13 +121,16 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
       zoneId: onboarding.zoneId!,
       persona: onboarding.persona!,
       durationDays: 7,
+      pointsToRedeem: _pointsToRedeem,
     );
 
     if (!mounted) return;
 
     if (!policyResponse.success) {
       setState(() => _isProcessing = false);
-      _showError(policyResponse.error ?? 'Payment verified but policy activation failed');
+      _showError(
+        policyResponse.error ?? 'Payment verified but policy activation failed',
+      );
       return;
     }
 
@@ -169,7 +174,9 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
   void _handleExternalWallet(ExternalWalletResponse response) {
     if (!mounted) return;
     setState(() => _isProcessing = false);
-    _showError('${response.walletName ?? 'External wallet'} is not supported for this checkout');
+    _showError(
+      '${response.walletName ?? 'External wallet'} is not supported for this checkout',
+    );
   }
 
   void _showError(String message) {
@@ -180,11 +187,13 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final onboarding = ref.watch(onboardingProvider);
+    final quotePreviewAsync = ref.watch(quotePreviewProvider);
     const basePremium = 99;
     const gstRate = 0.18;
     final gstAmount = (basePremium * gstRate).round();
     final total = basePremium + gstAmount;
+    final rider = ref.watch(currentRiderProvider).valueOrNull;
+    final loyaltyPoints = rider?.loyaltyPoints ?? 0;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -213,12 +222,12 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
 
               const SizedBox(height: 8),
 
-                Text(
-                  'Fixed weekly base premium for every rider.',
-                  style: AppTypography.bodyMedium.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ).animate(delay: 100.ms).fadeIn(),
+              Text(
+                'Fixed weekly base premium for every rider.',
+                style: AppTypography.bodyMedium.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ).animate(delay: 100.ms).fadeIn(),
 
               const SizedBox(height: 32),
 
@@ -241,18 +250,18 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
                     ),
                     child: Column(
                       children: [
-                        _buildPremiumRow('Base premium (1 week)', 'Rs $basePremium'),
-                        const Divider(height: 24),
                         _buildPremiumRow(
-                          'GST (18%)',
-                          '+ Rs $gstAmount',
+                          'Base premium (1 week)',
+                          'Rs $basePremium',
                         ),
+                        const Divider(height: 24),
+                        _buildPremiumRow('GST (18%)', '+ Rs $gstAmount'),
                         const Divider(height: 24),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                               'Total / week (incl. tax)',
+                              'Total / week (incl. tax)',
                               style: AppTypography.titleMedium.copyWith(
                                 color: AppColors.warning,
                                 fontWeight: FontWeight.w700,
@@ -304,6 +313,113 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
                 ),
               ).animate(delay: 300.ms).fadeIn(),
 
+              const SizedBox(height: 12),
+              if (loyaltyPoints > 0)
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.success.withOpacity(0.25),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Loyalty points', style: AppTypography.titleSmall),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Available: $loyaltyPoints points',
+                        style: AppTypography.bodySmall.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Redeem now',
+                              style: AppTypography.labelMedium,
+                            ),
+                          ),
+                          Switch(
+                            value: _pointsToRedeem > 0,
+                            onChanged: (on) {
+                              setState(() {
+                                _pointsToRedeem = on ? loyaltyPoints : 0;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Text(
+                          'Formula: 1 point = Rs 0.25, redeem up to 75% of gross premium.\nNo-claim week earns loyalty points.',
+                          style: AppTypography.bodySmall.copyWith(
+                            color: AppColors.textSecondary,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              const SizedBox(height: 16),
+              quotePreviewAsync.when(
+                data: (quote) {
+                  if (quote.isEmpty) return const SizedBox.shrink();
+                  final expected =
+                      (quote['expected_value'] as Map<String, dynamic>?) ?? {};
+                  final regret =
+                      (quote['regret_protection'] as Map<String, dynamic>?) ??
+                      {};
+
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.secondary.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.secondary.withOpacity(0.2),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Expected value', style: AppTypography.titleSmall),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Estimated payout Rs ${((expected['expected_payout'] ?? 0) as num).toStringAsFixed(0)} vs weekly premium Rs ${((quote['weekly_premium'] ?? 0) as num).toStringAsFixed(0)}',
+                          style: AppTypography.bodySmall.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Loyalty protection: earn ${((regret['loyalty_points_if_no_trigger'] ?? 0) as num).toStringAsFixed(0)} points if no trigger this week.',
+                          style: AppTypography.bodySmall.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                loading: () => const SizedBox.shrink(),
+                error: (_, _) => const SizedBox.shrink(),
+              ),
+
               const Spacer(),
 
               SizedBox(
@@ -350,12 +466,26 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
               ).animate(delay: 400.ms).fadeIn(),
 
               const SizedBox(height: 10),
-                Text(
-                  'Tax is included in checkout total. Policy premium remains Rs 99/week.',
-                  style: AppTypography.bodySmall.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+
+              OutlinedButton(
+                onPressed: _isProcessing
+                    ? null
+                    : () {
+                        ref
+                            .read(onboardingProvider.notifier)
+                            .setPurchaseLater(true);
+                        context.go(AppRoutes.home);
+                      },
+                child: const Text('Purchase later and continue'),
+              ),
+
+              const SizedBox(height: 10),
+              Text(
+                'Tax is included in checkout total. Policy premium remains Rs 99/week.',
+                style: AppTypography.bodySmall.copyWith(
+                  color: AppColors.textSecondary,
                 ),
+              ),
 
               const SizedBox(height: 16),
             ],

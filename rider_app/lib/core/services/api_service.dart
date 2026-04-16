@@ -186,6 +186,47 @@ class ApiService {
     );
   }
 
+  Future<ApiResponse<List<PublicPayoutLogEntry>>> getPublicPayoutLog({
+    int limit = 20,
+  }) async {
+    return get(
+      '/claims/public-payout-log?limit=$limit',
+      (json) => (((json as Map<String, dynamic>)['payouts'] ?? []) as List)
+          .map(
+            (item) =>
+                PublicPayoutLogEntry.fromJson(item as Map<String, dynamic>),
+          )
+          .toList(),
+    );
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> getTrustRules() async {
+    return get(
+      '/policies/trust-rules/public',
+      (json) => json as Map<String, dynamic>,
+    );
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> getOfferWindow(
+    String zoneId,
+  ) async {
+    return get(
+      '/policies/offer-window/public?zone_id=$zoneId',
+      (json) => json as Map<String, dynamic>,
+    );
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> getQuotePreview({
+    required String zoneId,
+    required String persona,
+    int durationDays = 7,
+  }) async {
+    return get(
+      '/policies/quote-preview/public?zone_id=$zoneId&persona=$persona&duration_days=$durationDays',
+      (json) => json as Map<String, dynamic>,
+    );
+  }
+
   Future<ApiResponse<List<Zone>>> getZones() async {
     return get(
       '/zones/',
@@ -331,6 +372,7 @@ class ApiService {
     String? persona,
     int durationDays = 7,
     String? existingPolicyId,
+    int pointsToRedeem = 0,
   }) async {
     return post('/payments/policy-order', {
       'flow_type': flowType,
@@ -339,6 +381,7 @@ class ApiService {
       'persona': persona,
       'duration_days': durationDays,
       'existing_policy_id': existingPolicyId,
+      'points_to_redeem': pointsToRedeem,
     }, (json) => json as Map<String, dynamic>);
   }
 
@@ -352,6 +395,7 @@ class ApiService {
     String? persona,
     int durationDays = 7,
     String? existingPolicyId,
+    int pointsToRedeem = 0,
   }) async {
     return post(
       '/payments/policy-confirm',
@@ -365,6 +409,7 @@ class ApiService {
         'persona': persona,
         'duration_days': durationDays,
         'existing_policy_id': existingPolicyId,
+        'points_to_redeem': pointsToRedeem,
       },
       (json) => Policy.fromJson(json as Map<String, dynamic>),
     );

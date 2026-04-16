@@ -9,6 +9,7 @@ class Rider {
   final double? latitude;
   final double? longitude;
   final double riskScore;
+  final int loyaltyPoints;
   final String status;
   final DateTime createdAt;
 
@@ -22,6 +23,7 @@ class Rider {
     this.latitude,
     this.longitude,
     required this.riskScore,
+    required this.loyaltyPoints,
     required this.status,
     required this.createdAt,
   });
@@ -37,6 +39,7 @@ class Rider {
       latitude: json['latitude']?.toDouble(),
       longitude: json['longitude']?.toDouble(),
       riskScore: (json['risk_score'] ?? 0.5).toDouble(),
+      loyaltyPoints: (json['loyalty_points'] ?? 0) as int,
       status: json['status'] ?? 'active',
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
@@ -392,6 +395,46 @@ class DeliveryHistoryItem {
           : null,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
+          : DateTime.now(),
+    );
+  }
+}
+
+class PublicPayoutLogEntry {
+  final String claimId;
+  final String rider;
+  final String triggerType;
+  final double triggerValue;
+  final double threshold;
+  final double payoutAmount;
+  final String? zone;
+  final String? txHash;
+  final DateTime processedAt;
+
+  PublicPayoutLogEntry({
+    required this.claimId,
+    required this.rider,
+    required this.triggerType,
+    required this.triggerValue,
+    required this.threshold,
+    required this.payoutAmount,
+    this.zone,
+    this.txHash,
+    required this.processedAt,
+  });
+
+  factory PublicPayoutLogEntry.fromJson(Map<String, dynamic> json) {
+    return PublicPayoutLogEntry(
+      claimId: json['claim_id'] ?? '',
+      rider: json['rider'] ?? 'Rider',
+      triggerType: json['trigger_type'] ?? 'unknown',
+      triggerValue: (json['trigger_value'] ?? 0).toDouble(),
+      threshold: (json['threshold'] ?? 0).toDouble(),
+      payoutAmount: (json['payout_amount'] ?? 0).toDouble(),
+      zone: json['zone'],
+      txHash: json['tx_hash'],
+      processedAt: json['processed_at'] != null
+          ? DateTime.parse(json['processed_at'])
           : DateTime.now(),
     );
   }

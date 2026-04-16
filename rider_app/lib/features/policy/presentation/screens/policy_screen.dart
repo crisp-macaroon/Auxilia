@@ -22,6 +22,8 @@ class PolicyScreen extends ConsumerWidget {
     final triggersAsync = ref.watch(triggersProvider);
     final newsAsync = ref.watch(zoneNewsProvider);
     final trafficAsync = ref.watch(zoneTrafficProvider);
+    final quotePreviewAsync = ref.watch(quotePreviewProvider);
+    final trustRulesAsync = ref.watch(trustRulesProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -115,6 +117,87 @@ class PolicyScreen extends ConsumerWidget {
                 newsAsync.when(
                   data: (news) => _NewsAlertsCard(news: news),
                   loading: () => const _LoadingBlock(height: 150),
+                  error: (_, _) => const SizedBox.shrink(),
+                ),
+                const SizedBox(height: 24),
+                trustRulesAsync.when(
+                  data: (rules) {
+                    if (rules.isEmpty) return const SizedBox.shrink();
+                    return Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withOpacity(0.07),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.success.withOpacity(0.22),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Trust by design',
+                            style: AppTypography.titleSmall,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            (rules['message'] ?? '').toString(),
+                            style: AppTypography.bodySmall.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, _) => const SizedBox.shrink(),
+                ),
+                const SizedBox(height: 16),
+                quotePreviewAsync.when(
+                  data: (quote) {
+                    if (quote.isEmpty) return const SizedBox.shrink();
+                    final expected =
+                        (quote['expected_value'] as Map<String, dynamic>?) ??
+                        {};
+                    final regret =
+                        (quote['regret_protection'] as Map<String, dynamic>?) ??
+                        {};
+                    return Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppColors.secondary.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.secondary.withOpacity(0.18),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Expected value and regret protection',
+                            style: AppTypography.titleSmall,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Estimated payout Rs ${((expected['expected_payout'] ?? 0) as num).toStringAsFixed(0)}',
+                            style: AppTypography.bodySmall.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Loyalty points if no trigger: ${((regret['loyalty_points_if_no_trigger'] ?? 0) as num).toStringAsFixed(0)} pts',
+                            style: AppTypography.bodySmall.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  loading: () => const SizedBox.shrink(),
                   error: (_, _) => const SizedBox.shrink(),
                 ),
                 const SizedBox(height: 24),
@@ -650,6 +733,7 @@ class _BuyPolicyAction extends ConsumerStatefulWidget {
 
 class _BuyPolicyActionState extends ConsumerState<_BuyPolicyAction> {
   bool _loading = false;
+  int _pointsToRedeem = 0;
   late final Razorpay _razorpay;
   Map<String, dynamic>? _pendingOrder;
 
@@ -684,6 +768,7 @@ class _BuyPolicyActionState extends ConsumerState<_BuyPolicyAction> {
       zoneId: rider.zoneId,
       persona: rider.persona,
       durationDays: 7,
+      pointsToRedeem: _pointsToRedeem,
     );
 
     if (!mounted) return;
@@ -746,6 +831,7 @@ class _BuyPolicyActionState extends ConsumerState<_BuyPolicyAction> {
       zoneId: rider.zoneId,
       persona: rider.persona,
       durationDays: 7,
+      pointsToRedeem: _pointsToRedeem,
     );
 
     if (!mounted) return;
@@ -837,6 +923,58 @@ class _BuyPolicyActionState extends ConsumerState<_BuyPolicyAction> {
             ),
           ),
           const SizedBox(height: 12),
+          if (widget.rider != null)
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Use loyalty points (${widget.rider!.loyaltyPoints})',
+                    style: AppTypography.bodySmall.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+                Switch(
+                  value: _pointsToRedeem > 0,
+                  onChanged: _loading
+                      ? null
+                      : (on) {
+                          setState(() {
+                            _pointsToRedeem = on
+                                ? (widget.rider!.loyaltyPoints)
+                                : 0;
+                          });
+                        },
+                ),
+              ],
+            ),
+          if (_pointsToRedeem > 0)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                'Applying $_pointsToRedeem points at checkout.',
+                style: AppTypography.bodySmall.copyWith(
+                  color: AppColors.success,
+                ),
+              ),
+            ),
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Text(
+              'Formula: 1 point = Rs 0.25, redeem cap = 75% of gross premium.\nNo-claim weeks earn loyalty points.',
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
+            ),
+          ),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(

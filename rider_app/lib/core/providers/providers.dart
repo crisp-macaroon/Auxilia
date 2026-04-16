@@ -172,6 +172,7 @@ class OnboardingState {
   final String? persona;
   final String? zoneId;
   final Zone? selectedZone;
+  final bool purchaseLater;
 
   OnboardingState({
     this.name,
@@ -181,6 +182,7 @@ class OnboardingState {
     this.persona,
     this.zoneId,
     this.selectedZone,
+    this.purchaseLater = false,
   });
 
   OnboardingState copyWith({
@@ -191,6 +193,7 @@ class OnboardingState {
     String? persona,
     String? zoneId,
     Zone? selectedZone,
+    bool? purchaseLater,
   }) {
     return OnboardingState(
       name: name ?? this.name,
@@ -200,6 +203,7 @@ class OnboardingState {
       persona: persona ?? this.persona,
       zoneId: zoneId ?? this.zoneId,
       selectedZone: selectedZone ?? this.selectedZone,
+      purchaseLater: purchaseLater ?? this.purchaseLater,
     );
   }
 
@@ -237,6 +241,10 @@ class OnboardingNotifier extends StateNotifier<OnboardingState> {
 
   void setZone(Zone zone) {
     state = state.copyWith(zoneId: zone.id, selectedZone: zone);
+  }
+
+  void setPurchaseLater(bool value) {
+    state = state.copyWith(purchaseLater: value);
   }
 
   Future<ApiResponse<RiderAuthSession>> register() async {
@@ -581,6 +589,44 @@ final claimHistoryProvider = FutureProvider<List<Claim>>((ref) async {
   final response = await api.getRiderClaimHistory(riderId);
   if (response.success && response.data != null) return response.data!;
   return [];
+});
+
+final publicPayoutLogProvider = FutureProvider<List<PublicPayoutLogEntry>>((
+  ref,
+) async {
+  final api = ref.watch(apiServiceProvider);
+  final response = await api.getPublicPayoutLog(limit: 20);
+  if (response.success && response.data != null) return response.data!;
+  return [];
+});
+
+final trustRulesProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final api = ref.watch(apiServiceProvider);
+  final response = await api.getTrustRules();
+  if (response.success && response.data != null) return response.data!;
+  return {};
+});
+
+final offerWindowProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final rider = await ref.watch(currentRiderProvider.future);
+  if (rider == null) return {};
+  final api = ref.watch(apiServiceProvider);
+  final response = await api.getOfferWindow(rider.zoneId);
+  if (response.success && response.data != null) return response.data!;
+  return {};
+});
+
+final quotePreviewProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final rider = await ref.watch(currentRiderProvider.future);
+  if (rider == null) return {};
+  final api = ref.watch(apiServiceProvider);
+  final response = await api.getQuotePreview(
+    zoneId: rider.zoneId,
+    persona: rider.persona,
+    durationDays: 7,
+  );
+  if (response.success && response.data != null) return response.data!;
+  return {};
 });
 
 final deliveryHistoryProvider = FutureProvider<List<DeliveryHistoryItem>>((

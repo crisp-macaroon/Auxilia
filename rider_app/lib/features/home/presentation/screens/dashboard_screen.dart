@@ -25,6 +25,7 @@ class DashboardScreen extends ConsumerWidget {
     final deliveryHistoryAsync = ref.watch(deliveryHistoryProvider);
     final heatmapAsync = ref.watch(zoneHeatmapProvider);
     final architectureAsync = ref.watch(architectureProvider);
+    final offerWindowAsync = ref.watch(offerWindowProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -123,6 +124,51 @@ class DashboardScreen extends ConsumerWidget {
                   title: 'Heatmap unavailable',
                   subtitle: 'Start backend to render dynamic zone heat.',
                 ),
+              ),
+              const SizedBox(height: 24),
+              offerWindowAsync.when(
+                data: (offer) {
+                  if (offer.isEmpty) return const SizedBox.shrink();
+                  final highRisk = offer['high_risk_window'] == true;
+                  if (!highRisk) return const SizedBox.shrink();
+
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: AppColors.warning.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'High-risk window detected',
+                          style: AppTypography.titleSmall,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          (offer['nudge'] ?? '').toString(),
+                          style: AppTypography.bodySmall.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () => context.go(AppRoutes.policy),
+                            child: const Text('One-tap activate coverage'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                loading: () => const SizedBox.shrink(),
+                error: (_, _) => const SizedBox.shrink(),
               ),
               const SizedBox(height: 24),
               Row(

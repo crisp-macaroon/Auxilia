@@ -57,6 +57,7 @@ class Rider(Base):
     avg_hourly_income = Column(Float, default=180.0)
     avg_daily_orders = Column(Integer, default=12)
     avg_km_rate = Column(Float, default=18.0)
+    loyalty_points = Column(Integer, default=0)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
     risk_score = Column(Float, default=0.5)
@@ -109,6 +110,8 @@ class Policy(Base):
     end_date = Column(DateTime(timezone=True), nullable=False)
     status = Column(Enum(PolicyStatus), default=PolicyStatus.ACTIVE, index=True)
     tx_hash = Column(String(100), nullable=True)
+    loyalty_points_awarded = Column(Boolean, default=False)
+    loyalty_points_awarded_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     

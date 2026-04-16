@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models.database import Policy, Rider
+from app.models.database import Claim, Policy, Rider
 from app.models.schemas import (
     PaymentFlowType,
     PersonaType,
@@ -29,6 +29,50 @@ from app.models.schemas import (
 from app.routers.policies import calculate_premium, generate_policy_hash
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
+
+POINT_VALUE_INR = 0.25
+MAX_REDEEM_SHARE = 0.75
+
+
+async def _award_no_claim_loyalty_points(db: AsyncSession, rider_id: str) -> int:
+    """
+    Award loyalty points once for expired policies with no claims.
+    Conservative reward to protect economics.
+    """
+    now = datetime.utcnow()
+    eligible_result = await db.execute(
+        select(Policy).where(
+            Policy.rider_id == rider_id,
+            Policy.end_date < now,
+            Policy.loyalty_points_awarded == False,
+        )
+    )
+    eligible = eligible_result.scalars().all()
+    if not eligible:
+        return 0
+
+    granted = 0
+    for policy in eligible:
+        claims_count_result = await db.execute(
+            select(Claim.id).where(Claim.policy_id == policy.id)
+        )
+        has_claim = claims_count_result.first() is not None
+
+        if not has_claim:
+            reward = int(max(10, min(90, round((policy.premium or 0.0) * 0.45))))
+            granted += reward
+
+        policy.loyalty_points_awarded = True
+        policy.loyalty_points_awarded_at = now
+
+    if granted > 0:
+        rider_result = await db.execute(select(Rider).where(Rider.id == rider_id))
+        rider = rider_result.scalar_one_or_none()
+        if rider:
+            rider.loyalty_points = int((rider.loyalty_points or 0) + granted)
+
+    await db.commit()
+    return granted
 
 
 async def _resolve_policy_context(payload: PolicyPaymentOrderRequest | PolicyPaymentConfirmRequest, db: AsyncSession):
@@ -99,6 +143,9 @@ async def create_policy_payment_order(
     db: AsyncSession = Depends(get_db),
 ):
     ctx = await _resolve_policy_context(payload, db)
+    await _award_no_claim_loyalty_points(db, ctx["rider_id"])
+
+    rider = ctx["rider"]
     premium_calc = await calculate_premium(
         rider_id=ctx["rider_id"],
         zone_id=ctx["zone_id"],
@@ -110,8 +157,18 @@ async def create_policy_payment_order(
     premium_value = float(premium_calc["final_premium"])
     gst_rate = 0.18
     gst_amount = round(premium_value * gst_rate, 2)
-    total_amount = round(premium_value + gst_amount, 2)
-    amount_paise = int(round(total_amount * 100))
+    gross_amount = round(premium_value + gst_amount, 2)
+
+    available_points = int(getattr(rider, "loyalty_points", 0) or 0)
+    requested_points = int(payload.points_to_redeem or 0)
+    capped_points = max(0, min(available_points, requested_points))
+    max_value = gross_amount * MAX_REDEEM_SHARE
+    requested_value = capped_points * POINT_VALUE_INR
+    redeem_value = round(min(max_value, requested_value), 2)
+    points_redeemed = int(round(redeem_value / POINT_VALUE_INR))
+
+    net_payable = max(1.0, round(gross_amount - redeem_value, 2))
+    amount_paise = int(round(net_payable * 100))
     receipt = f"aux-{payload.flow_type.value}-{str(uuid.uuid4())[:12]}"
     notes = {
         "flow_type": payload.flow_type.value,
@@ -122,6 +179,9 @@ async def create_policy_payment_order(
         "premium": str(premium_value),
         "gst": str(gst_amount),
         "tax_rate": "0.18",
+        "points_redeemed": str(points_redeemed),
+        "points_value": str(redeem_value),
+        "net_payable": str(net_payable),
     }
     if payload.existing_policy_id:
         notes["existing_policy_id"] = payload.existing_policy_id
@@ -149,7 +209,7 @@ async def create_policy_payment_order(
             checkout_mode = "razorpay"
             key_id = settings.RAZORPAY_KEY_ID
 
-    rider = ctx["rider"]
+    no_claim_points = int(max(10, min(90, round(premium_value * 0.45))))
     return PolicyPaymentOrderResponse(
         checkout_mode=checkout_mode,
         key_id=key_id,
@@ -160,6 +220,13 @@ async def create_policy_payment_order(
         persona=ctx["persona"],
         duration_days=ctx["duration_days"],
         premium=premium_calc["final_premium"],
+        gst_amount=gst_amount,
+        gross_amount=gross_amount,
+        points_redeemed=points_redeemed,
+        points_value=redeem_value,
+        net_payable=net_payable,
+        loyalty_balance_after_redemption=max(0, available_points - points_redeemed),
+        no_claim_loyalty_points_estimate=no_claim_points,
         coverage=premium_calc["coverage"],
         flow_type=payload.flow_type,
         notes=notes,
@@ -180,6 +247,7 @@ async def confirm_policy_payment(
         raise HTTPException(status_code=400, detail="Invalid Razorpay signature")
 
     ctx = await _resolve_policy_context(payload, db)
+    rider = ctx["rider"]
     premium_calc = await calculate_premium(
         rider_id=ctx["rider_id"],
         zone_id=ctx["zone_id"],
@@ -215,6 +283,15 @@ async def confirm_policy_payment(
         tx_hash=tx_hash,
         created_at=now,
     )
+
+    points_to_redeem = int(payload.points_to_redeem or 0)
+    if points_to_redeem > 0:
+        max_points_from_premium = int(
+            round((premium_calc["final_premium"] * 1.18 * MAX_REDEEM_SHARE) / POINT_VALUE_INR)
+        )
+        safe_redeem = max(0, min(int(rider.loyalty_points or 0), points_to_redeem, max_points_from_premium))
+        if safe_redeem > 0:
+            rider.loyalty_points = int(max(0, int(rider.loyalty_points or 0) - safe_redeem))
 
     db.add(policy)
     await db.commit()

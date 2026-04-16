@@ -135,6 +135,126 @@ def _resolve_duration_factor(duration_days: int) -> float:
     return 1.15
 
 
+@router.get("/trust-rules/public")
+async def get_public_trust_rules():
+    """Public trust rules to show parametric payout logic before purchase."""
+    return {
+        "parametric_only": True,
+        "message": "Payouts are trigger-based. No document-heavy manual claim review for basic eligibility.",
+        "trigger_rules": [
+            {
+                "trigger_type": "rain",
+                "threshold": settings.RAIN_THRESHOLD_MM,
+                "base_payout": settings.RAIN_PAYOUT,
+            },
+            {
+                "trigger_type": "traffic",
+                "threshold": settings.CONGESTION_THRESHOLD,
+                "base_payout": settings.TRAFFIC_PAYOUT,
+            },
+            {
+                "trigger_type": "road_disruption",
+                "threshold": settings.INCIDENT_THRESHOLD,
+                "base_payout": settings.ROAD_DISRUPTION_PAYOUT,
+            },
+            {
+                "trigger_type": "surge",
+                "threshold": settings.SURGE_THRESHOLD,
+                "base_payout": settings.SURGE_PAYOUT,
+            },
+        ],
+        "payout_severity_model": {
+            "just_above_threshold": "partial payout",
+            "far_above_threshold": "higher payout",
+        },
+    }
+
+
+@router.get("/offer-window/public")
+async def get_public_offer_window(
+    zone_id: str,
+):
+    """Timing-aware nudge window for high-risk shift activation."""
+    zone_assessment = await risk_agent.assess_zone_risk(zone_id)
+
+    combined = float(zone_assessment.get("combined_risk", 0.0))
+    weather = float(zone_assessment.get("weather_risk", 0.0))
+    traffic = float(zone_assessment.get("traffic_risk", 0.0))
+    incident = float(zone_assessment.get("incident_risk", 0.0))
+
+    high_risk_window = (
+        combined >= 0.58
+        or weather >= 0.55
+        or traffic >= 0.60
+        or incident >= 0.50
+    )
+    rain_probability = int(max(5, min(95, round(weather * 100))))
+
+    if high_risk_window:
+        nudge = (
+            f"Rain probability {rain_probability}%. Estimated disruption risk is elevated. "
+            f"Best activation window: next 24-48 hours."
+        )
+    else:
+        nudge = (
+            f"Current risk is moderate. Rain probability {rain_probability}%. "
+            f"You can activate now or wait for a higher-risk window."
+        )
+
+    return {
+        "zone_id": zone_id,
+        "high_risk_window": high_risk_window,
+        "nudge": nudge,
+        "risk_level": zone_assessment.get("risk_level", "medium"),
+        "combined_risk": round(combined, 3),
+        "rain_probability_percent": rain_probability,
+        "event_window_seconds": zone_assessment.get("event_window_seconds", 300),
+        "assessed_at": zone_assessment.get("assessed_at"),
+    }
+
+
+@router.get("/quote-preview/public")
+async def get_quote_preview(
+    zone_id: str,
+    persona: PersonaType,
+    duration_days: int = 7,
+):
+    """Public quote preview with expected-value and regret-protection hints."""
+    base_premium = BASE_PREMIUM.get(persona, 99.0)
+    base_coverage = COVERAGE_AMOUNTS.get(persona, 3000.0)
+
+    zone_assessment = await risk_agent.assess_zone_risk(zone_id)
+    combined = float(zone_assessment.get("combined_risk", 0.0))
+
+    dynamic_weekly = max(65.0, min(249.0, round(base_premium + (combined - 0.45) * 22, 2)))
+    duration_factor = _resolve_duration_factor(duration_days)
+    final_premium = round(dynamic_weekly * duration_factor * max(1, duration_days / 7), 2)
+
+    estimated_income_at_risk = round(base_coverage * min(0.82, (0.28 + combined * 0.62)), 2)
+    expected_payout = round(estimated_income_at_risk * min(0.9, (0.32 + combined * 0.58)), 2)
+    loyalty_points = int(max(10, round(dynamic_weekly * 0.45)))
+
+    return {
+        "zone_id": zone_id,
+        "persona": persona,
+        "duration_days": duration_days,
+        "weekly_premium": dynamic_weekly,
+        "final_premium": final_premium,
+        "coverage": base_coverage,
+        "risk_level": zone_assessment.get("risk_level", "medium"),
+        "expected_value": {
+            "estimated_income_at_risk": estimated_income_at_risk,
+            "expected_payout": expected_payout,
+            "note": "Expected value is estimated from local trigger risk, not guaranteed payout.",
+        },
+        "regret_protection": {
+            "loyalty_points_if_no_trigger": loyalty_points,
+            "reward_type": "loyalty_points",
+            "note": "If no trigger activates this week, loyalty points are credited for consistent coverage.",
+        },
+    }
+
+
 @router.post("/", response_model=PolicyResponse)
 async def create_policy(
     policy: PolicyCreate,
@@ -544,6 +664,16 @@ async def calculate_premium(
         "coverage": base_coverage,
         "recommended_coverage_hours": recommended_coverage_hours,
         "pricing_note": pricing_note,
+        "expected_value": {
+            "estimated_income_at_risk": round(base_coverage * min(0.82, 0.26 + (combined_zone_risk * 0.62)), 2),
+            "expected_payout": round(base_coverage * min(0.72, 0.16 + (combined_zone_risk * 0.48)), 2),
+            "note": "Estimated from hyper-local trigger risk and zone conditions.",
+        },
+        "regret_protection": {
+            "loyalty_points_if_no_trigger": int(max(10, round(weekly_premium * 0.45))),
+            "reward_type": "loyalty_points",
+            "note": "Loyalty points accrue when no trigger event occurs in coverage window.",
+        },
         "breakdown": {
             "base": base_premium,
             "static_zone_factor": round(static_zone_factor, 3),

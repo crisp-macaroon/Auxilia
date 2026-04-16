@@ -49,6 +49,7 @@ async def ensure_rider_auth_columns() -> None:
             ("avg_hourly_income", "ALTER TABLE riders ADD COLUMN avg_hourly_income FLOAT DEFAULT 180.0"),
             ("avg_daily_orders", "ALTER TABLE riders ADD COLUMN avg_daily_orders INTEGER DEFAULT 12"),
             ("avg_km_rate", "ALTER TABLE riders ADD COLUMN avg_km_rate FLOAT DEFAULT 18.0"),
+            ("loyalty_points", "ALTER TABLE riders ADD COLUMN loyalty_points INTEGER DEFAULT 0"),
         ]
         for column_name, statement in statements:
             try:
@@ -94,6 +95,20 @@ async def ensure_delivery_checkin_table() -> None:
             pass
 
 
+async def ensure_policy_loyalty_columns() -> None:
+    async with engine.begin() as conn:
+        statements = [
+            ("loyalty_points_awarded", "ALTER TABLE policies ADD COLUMN loyalty_points_awarded BOOLEAN DEFAULT FALSE"),
+            ("loyalty_points_awarded_at", "ALTER TABLE policies ADD COLUMN loyalty_points_awarded_at TIMESTAMP"),
+        ]
+        for column_name, statement in statements:
+            try:
+                await conn.exec_driver_sql(statement)
+                logger.info("Added policies.%s column", column_name)
+            except Exception:
+                pass
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -114,6 +129,7 @@ async def lifespan(app: FastAPI):
             pass
     await ensure_rider_auth_columns()
     await ensure_delivery_checkin_table()
+    await ensure_policy_loyalty_columns()
     logger.info("Database tables created")
     
     # Start trigger agent polling in background
