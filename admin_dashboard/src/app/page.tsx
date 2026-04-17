@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { ArrowRight, Bike, Shield, UserCog } from 'lucide-react';
+import Image from 'next/image';
+import { ArrowRight, Bike, UserCog } from 'lucide-react';
 
 export default function RoleGatewayPage() {
   return (
@@ -10,7 +11,7 @@ export default function RoleGatewayPage() {
       <div className="relative mx-auto max-w-5xl">
         <div className="mb-8 flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 shadow-lg">
-            <Shield className="h-6 w-6 text-white" />
+            <Image src="/auxilia-logo.svg" alt="Auxilia logo" width={28} height={28} className="h-7 w-7 object-contain" priority />
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-500">Auxilia</p>
@@ -20,8 +21,13 @@ export default function RoleGatewayPage() {
 
         <div className="grid gap-6 md:grid-cols-2">
           <div className="rounded-3xl border border-white/70 bg-white/90 p-7 shadow-xl backdrop-blur">
-            <div className="mb-4 inline-flex rounded-xl bg-orange-50 p-3 text-orange-600">
-              <Bike className="h-6 w-6" />
+            <div className="mb-4 flex items-center gap-3">
+              <span className="inline-flex rounded-xl bg-orange-50 p-3 text-orange-600">
+                <Bike className="h-6 w-6" />
+              </span>
+              <span className="inline-flex rounded-xl border border-orange-100 bg-white p-2">
+                <Image src="/auxilia-logo.svg" alt="Auxilia rider app logo" width={30} height={30} className="h-7 w-7 object-contain" />
+              </span>
             </div>
             <h2 className="text-xl font-semibold text-slate-900">I am a rider</h2>
             <p className="mt-2 text-sm text-slate-600">

@@ -2,7 +2,8 @@
 
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Lock, Shield, User } from 'lucide-react';
+import Image from 'next/image';
+import { Lock, User } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -41,7 +42,7 @@ export default function LoginPage() {
       <div className="relative w-full max-w-md rounded-3xl border border-white/70 bg-white/90 p-8 shadow-2xl backdrop-blur">
         <div className="mb-8 flex items-center gap-4">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 shadow-lg">
-            <Shield className="h-7 w-7 text-white" />
+            <Image src="/auxilia-logo.svg" alt="Auxilia logo" width={30} height={30} className="h-7 w-7 object-contain" priority />
           </div>
           <div>
             <p className="text-sm font-medium uppercase tracking-[0.25em] text-orange-500">Auxilia</p>
