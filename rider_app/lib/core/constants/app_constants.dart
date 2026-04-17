@@ -3,8 +3,11 @@ class ApiConstants {
   ApiConstants._();
 
   // Base URLs
-  static const String baseUrl = 'http://20.244.41.25/api/v1';
-  static const String productionUrl = 'https://api.auxilia.app/api/v1';
+  static const String productionUrl = 'https://auxila-api.sabarixr.me/api/v1';
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: productionUrl,
+  );
 
   // Endpoints
   static const String onboard = '/onboard';

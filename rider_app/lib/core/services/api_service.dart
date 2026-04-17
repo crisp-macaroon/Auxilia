@@ -3,11 +3,15 @@ import 'package:dio/dio.dart';
 import '../../../shared/models/models.dart';
 
 class ApiConfig {
-  // Use this for physical devices on the same network
-  static const String baseUrl = 'http://20.244.41.25/api/v1';
+  // Use --dart-define API_BASE_URL=<url> to override at build time
+  static const String productionUrl = 'https://auxila-api.sabarixr.me/api/v1';
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: productionUrl,
+  );
   static const String localUrl = 'http://localhost:8000/api/v1';
   static const String emulatorUrl = 'http://10.0.2.2:8000/api/v1';
-  static const String networkUrl = 'http://20.244.41.25/api/v1';
+  static const String networkUrl = productionUrl;
   static const Duration timeout = Duration(seconds: 30);
 }
 

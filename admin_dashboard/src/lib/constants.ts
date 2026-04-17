@@ -1,5 +1,12 @@
 // API Configuration
-export const SERVER_API_BASE_URL = 'http://20.244.41.25/api/v1';
+const PROD_API_BASE_URL = 'https://auxila-api.sabarixr.me/api/v1';
+const DEV_API_BASE_URL = 'http://127.0.0.1:8000/api/v1';
+
+const resolvedServerApiBaseUrl =
+  process.env.NEXT_PUBLIC_API_URL ??
+  (process.env.NODE_ENV === 'production' ? PROD_API_BASE_URL : DEV_API_BASE_URL);
+
+export const SERVER_API_BASE_URL = resolvedServerApiBaseUrl.replace(/\/$/, '');
 
 export const API_BASE_URL = typeof window === 'undefined' ? SERVER_API_BASE_URL : '/api/v1';
 
