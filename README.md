@@ -86,7 +86,7 @@ Start here: [docs/README.md](docs/README.md)
 - Setup and demo credentials: [docs/SETUP.md](docs/SETUP.md) - local run + demo credentials.
 - Environment variables (`.env.sample`): [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) - .env variable reference.
 - API route map: [docs/API.md](docs/API.md) - route groups and endpoints.
-- Deployment notes: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) - GGHCR, VM, Nginx, TLS.
+- Deployment notes: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) - GHCR, VM, Nginx, TLS.
 
 ## Visuals
 
