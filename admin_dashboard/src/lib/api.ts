@@ -365,7 +365,7 @@ export async function getClaims(params?: { status?: string; triggerType?: string
   if (params?.status && params.status !== 'all') search.set('status', params.status);
   if (params?.triggerType && params.triggerType !== 'all') search.set('trigger_type', params.triggerType);
   const query = search.toString();
-  return apiFetch<ClaimListItem[]>(`/claims/${query ? `?${query}` : ''}`);
+  return apiFetch<ClaimListItem[]>(`/claims${query ? `?${query}` : ''}`);
 }
 
 export async function getClaimStats() {
@@ -390,7 +390,7 @@ export async function getPolicies(params?: { status?: string }) {
   const search = new URLSearchParams();
   if (params?.status && params.status !== 'all') search.set('status', params.status);
   const query = search.toString();
-  return apiFetch<PolicyListItem[]>(`/policies/${query ? `?${query}` : ''}`);
+  return apiFetch<PolicyListItem[]>(`/policies${query ? `?${query}` : ''}`);
 }
 
 export async function createPolicy(payload: {
@@ -439,7 +439,7 @@ export async function getRiders(params?: { status?: string }) {
   const search = new URLSearchParams();
   if (params?.status && params.status !== 'all') search.set('status', params.status);
   const query = search.toString();
-  return apiFetch<RiderListItem[]>(`/riders/${query ? `?${query}` : ''}`);
+  return apiFetch<RiderListItem[]>(`/riders${query ? `?${query}` : ''}`);
 }
 
 export async function getRider(riderId: string) {
@@ -500,7 +500,7 @@ export async function getZones(params?: { city?: string; is_active?: boolean }) 
   if (params?.city) search.set('city', params.city);
   if (typeof params?.is_active === 'boolean') search.set('is_active', String(params.is_active));
   const query = search.toString();
-  return apiFetch<ZoneListItem[]>(`/zones/${query ? `?${query}` : ''}`);
+  return apiFetch<ZoneListItem[]>(`/zones${query ? `?${query}` : ''}`);
 }
 
 export async function getRiderStats() {

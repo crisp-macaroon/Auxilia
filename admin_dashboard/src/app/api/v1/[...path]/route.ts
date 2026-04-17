@@ -4,13 +4,23 @@ import { NextResponse } from 'next/server';
 import { SERVER_API_BASE_URL } from '@/lib/constants';
 import { ADMIN_TOKEN_COOKIE } from '@/lib/auth';
 
+function getTokenFromCookieHeader(cookieHeader: string | null): string | null {
+  if (!cookieHeader) return null;
+  const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${ADMIN_TOKEN_COOKIE}=([^;]+)`));
+  return match?.[1] ?? null;
+}
+
 async function proxyRequest(request: Request, params: Promise<{ path: string[] }>) {
   const { path } = await params;
   const cookieStore = await cookies();
-  const token = cookieStore.get(ADMIN_TOKEN_COOKIE)?.value;
+  const cookieToken = cookieStore.get(ADMIN_TOKEN_COOKIE)?.value;
+  const headerToken = getTokenFromCookieHeader(request.headers.get('cookie'));
+  const token = cookieToken ?? headerToken;
 
   const incomingUrl = new URL(request.url);
-  const upstreamUrl = `${SERVER_API_BASE_URL}/${path.join('/')}${incomingUrl.search}`;
+  const normalizedPath = path.join('/');
+  const pathSuffix = path.length === 1 ? '/' : '';
+  const upstreamUrl = `${SERVER_API_BASE_URL}/${normalizedPath}${pathSuffix}${incomingUrl.search}`;
   const headers = new Headers(request.headers);
   headers.delete('host');
   if (token) {
