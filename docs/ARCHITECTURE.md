@@ -4,7 +4,7 @@ Auxilia has three products sharing one backend:
 
 - Rider app (`rider_app`), the worker-facing mobile app
 - Admin dashboard (`admin_dashboard`), ops and insurer tooling
-- FastAPI backend (`backend`), FastAPI service handling policies, claims, trigger monitoring, fraud checks, and payouts
+- FastAPI backend (`backend`), service handling policies, claims, trigger monitoring, fraud checks, and payouts
 
 ## High-Level Diagram
 
