@@ -93,10 +93,6 @@ Start here: [docs/README.md](docs/README.md)
 - API route map: [docs/API.md](docs/API.md) - route groups and endpoints.
 - Deployment notes: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) - GHCR, VM, Nginx, TLS.
 
-## Visuals
-
-Architecture and product flow Mermaid diagrams are already included in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). PNG/SVG screenshots and flow images can be added later without changing this structure.
-
 ## API Docs
 
 When running locally:
