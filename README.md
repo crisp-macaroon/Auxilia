@@ -393,6 +393,31 @@ The production site at `https://auxilia.sabarixr.me` runs with:
 - Admin Dashboard: deployed on Vercel with `NEXT_PUBLIC_API_URL` set to the production backend
 - Rider App: Flutter build installed on Android device or emulator pointing to the production backend
 
+### Backend Container Deploy (VM)
+
+This repo includes Docker Compose primarily for local orchestration and quick dev startup.
+For production, you can run the backend as a standalone container on your VM with its own domain.
+
+The workflow at `.github/workflows/backend-image.yml` builds and publishes backend images to GHCR on every push to `main` that touches `backend/`.
+
+```bash
+# On VM
+docker pull ghcr.io/<owner>/auxilia-backend:latest
+
+docker run -d \
+  --name auxilia-backend \
+  --restart unless-stopped \
+  -p 8000:8000 \
+  --env-file /path/to/backend.env \
+  ghcr.io/<owner>/auxilia-backend:latest
+```
+
+If your GHCR package is private, log in first:
+
+```bash
+echo "<PAT>" | docker login ghcr.io -u <github-username> --password-stdin
+```
+
 For a PostgreSQL upgrade (recommended for production), install the postgres extras:
 
 ```bash
