@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
@@ -10,7 +11,6 @@ import {
   BarChart3,
   Zap,
   Settings,
-  Shield,
   LogOut,
   Menu,
   X,
@@ -52,7 +52,7 @@ export function Sidebar() {
       <div className="flex h-16 items-center justify-between border-b border-slate-200 px-4">
         <Link href="/dashboard" className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 shadow-lg">
-            <Shield className="h-6 w-6 text-white" />
+            <Image src="/auxilia-logo.svg" alt="Auxilia logo" width={24} height={24} className="h-6 w-6 object-contain" priority />
           </div>
           {!isCollapsed && (
             <span className="text-xl font-bold tracking-tight text-slate-900">Auxilia</span>

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../core/providers/providers.dart';
 import '../../../../core/theme/theme.dart';
@@ -27,7 +28,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     final riderId = await ref.read(currentRiderIdProvider.future);
     final token = await ref.read(currentRiderTokenProvider.future);
     if (!mounted) return;
-    context.go(riderId == null || token == null ? AppRoutes.onboarding : AppRoutes.home);
+    context.go(
+      riderId == null || token == null ? AppRoutes.onboarding : AppRoutes.home,
+    );
   }
 
   @override
@@ -53,10 +56,23 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                       ),
                     ],
                   ),
-                  child: const Icon(
-                    Icons.shield_rounded,
-                    size: 64,
-                    color: AppColors.primary,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Icon(
+                        Icons.shield_rounded,
+                        size: 74,
+                        color: AppColors.primary.withOpacity(0.16),
+                      ),
+                      SizedBox(
+                        width: 52,
+                        height: 52,
+                        child: SvgPicture.asset(
+                          'assets/images/auxilia_logo.svg',
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ],
                   ),
                 )
                 .animate()
