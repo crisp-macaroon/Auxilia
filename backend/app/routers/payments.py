@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models.database import Claim, Policy, Rider
+from app.models.database import Claim, Policy, Rider, Zone
 from app.models.schemas import (
     PaymentFlowType,
     PersonaType,
@@ -107,6 +107,8 @@ async def _resolve_policy_context(payload: PolicyPaymentOrderRequest | PolicyPay
     if not rider:
         raise HTTPException(status_code=404, detail="Rider not found")
 
+    await _ensure_zone_exists(db=db, zone_id=payload.zone_id, rider=rider)
+
     existing_active = await db.execute(
         select(Policy).where(
             Policy.rider_id == payload.rider_id,
@@ -125,6 +127,36 @@ async def _resolve_policy_context(payload: PolicyPaymentOrderRequest | PolicyPay
         "duration_days": payload.duration_days,
         "existing_policy": None,
     }
+
+
+async def _ensure_zone_exists(db: AsyncSession, zone_id: str, rider: Rider) -> None:
+    zone_result = await db.execute(select(Zone).where(Zone.id == zone_id))
+    zone = zone_result.scalar_one_or_none()
+    if zone is not None:
+        return
+
+    if zone_id != "route_pending":
+        raise HTTPException(status_code=400, detail=f"Invalid zone_id: {zone_id}")
+
+    # Safety net for onboarding demo flow where route zone is resolved later.
+    # Keeping this id stable prevents payment confirmation from failing on FK.
+    db.add(
+        Zone(
+            id="route_pending",
+            name="Route Risk Pending",
+            city="Dynamic Route",
+            state=None,
+            country="IN",
+            latitude=float(rider.latitude or 0.0),
+            longitude=float(rider.longitude or 0.0),
+            radius_km=1.0,
+            risk_level="medium",
+            base_premium_factor=1.0,
+            is_active=True,
+            created_at=datetime.utcnow(),
+        )
+    )
+    await db.flush()
 
 
 def _verify_signature(order_id: str, payment_id: str, signature: str | None) -> bool:
