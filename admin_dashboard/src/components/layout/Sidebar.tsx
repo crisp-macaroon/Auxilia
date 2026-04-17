@@ -14,6 +14,7 @@ import {
   LogOut,
   Menu,
   X,
+  Loader2,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -32,6 +33,7 @@ export function Sidebar() {
   const router = useRouter();
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
 
   async function handleLogout() {
     await fetch('/api/auth/logout', { method: 'POST' });
@@ -68,18 +70,33 @@ export function Sidebar() {
       <nav className="mt-6 flex flex-col gap-1 px-3">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
+          const isPending = pendingHref === item.href && pathname !== item.href;
           return (
             <Link
               key={item.name}
               href={item.href}
+              onClick={(event) => {
+                if (isActive || isPending) {
+                  event.preventDefault();
+                  return;
+                }
+                event.preventDefault();
+                setPendingHref(item.href);
+                router.push(item.href);
+              }}
               className={cn(
                 'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200',
                 isActive
                   ? 'bg-orange-50 text-orange-600 shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
+                isPending && 'cursor-wait opacity-80'
               )}
             >
-              <item.icon className={cn('h-5 w-5', isActive && 'text-orange-600')} />
+              {isPending ? (
+                <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
+              ) : (
+                <item.icon className={cn('h-5 w-5', isActive && 'text-orange-600')} />
+              )}
               {!isCollapsed && <span>{item.name}</span>}
             </Link>
           );

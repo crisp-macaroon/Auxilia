@@ -31,6 +31,7 @@ export default function PoliciesPage() {
   const [zones, setZones] = useState<ZoneListItem[]>([]);
   const [createForm, setCreateForm] = useState({ rider_id: '', zone_id: '', persona: 'qcommerce' as 'qcommerce' | 'food_delivery', duration_days: 7 });  // Weekly default
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   async function reload() {
     setError(null);
@@ -49,6 +50,7 @@ export default function PoliciesPage() {
 
   useEffect(() => {
     async function load() {
+      setLoading(true);
       setError(null);
       const [policiesResult, statsResult, ridersResult, zonesResult] = await Promise.allSettled([
         getPolicies(),
@@ -74,6 +76,8 @@ export default function PoliciesPage() {
       if (zonesResult.status === 'fulfilled') {
         setZones(zonesResult.value);
       }
+
+      setLoading(false);
     }
     void load();
   }, []);
@@ -158,7 +162,18 @@ export default function PoliciesPage() {
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
       ) : null}
 
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      {loading ? (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+            {[...Array.from({ length: 4 })].map((_, index) => (
+              <div key={`policy-stat-skel-${index}`} className="h-24 animate-pulse rounded-xl border border-slate-200 bg-slate-100" />
+            ))}
+          </div>
+          <div className="h-96 animate-pulse rounded-2xl border border-slate-200 bg-slate-100" />
+        </div>
+      ) : null}
+
+      {!loading ? <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -215,7 +230,7 @@ export default function PoliciesPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </div> : null}
 
       {selectedPolicy ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setSelectedPolicy(null)}>

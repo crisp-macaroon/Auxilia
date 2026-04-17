@@ -40,6 +40,7 @@ export default function RidersPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newRider, setNewRider] = useState<NewRiderForm>({ name: '', phone: '', persona: 'qcommerce', zone_id: '' });
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
 
   async function reload() {
@@ -59,6 +60,7 @@ export default function RidersPage() {
 
   useEffect(() => {
     async function load() {
+      setLoading(true);
       setError(null);
       const [itemsResult, overviewResult, zonesResult] = await Promise.allSettled([
         getRiders(),
@@ -83,6 +85,8 @@ export default function RidersPage() {
           setNewRider((current) => current.zone_id ? current : { ...current, zone_id: zoneItems[0].id });
         }
       }
+
+      setLoading(false);
     }
     void load();
   }, []);
@@ -146,7 +150,22 @@ export default function RidersPage() {
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+      {loading ? (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+            {[...Array.from({ length: 4 })].map((_, index) => (
+              <div key={`rider-stat-skel-${index}`} className="h-24 animate-pulse rounded-xl border border-slate-200 bg-slate-100" />
+            ))}
+          </div>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {[...Array.from({ length: 6 })].map((_, index) => (
+              <div key={`rider-card-skel-${index}`} className="h-64 animate-pulse rounded-2xl border border-slate-200 bg-slate-100" />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {!loading ? <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         {filteredRiders.map((rider) => {
           const avatar = rider.name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
           const menuOpen = activeMenuRiderId === rider.id;
@@ -187,7 +206,7 @@ export default function RidersPage() {
             </div>
           );
         })}
-      </div>
+      </div> : null}
 
       {showAddModal ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setShowAddModal(false)}>
