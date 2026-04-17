@@ -29,6 +29,9 @@ AsyncSessionLocal = async_sessionmaker(
     autoflush=False,
 )
 
+# Backward-compatible alias used by async background tasks
+async_session_maker = AsyncSessionLocal
+
 
 async def get_db() -> AsyncSession:
     async with AsyncSessionLocal() as session:
