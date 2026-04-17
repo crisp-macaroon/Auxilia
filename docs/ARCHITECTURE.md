@@ -59,6 +59,44 @@ flowchart TD
   L --> M[Worker + Admin Dashboard Updates]
 ```
 
+## AI Core Diagram
+
+This diagram shows the core AI path for weekly risk scoring and premium recommendation.
+
+```mermaid
+flowchart LR
+  Rider[(Rider + Zone + Shift Context)] --> Feat[Feature Builder]
+  Feat --> RiskModel[Risk Scoring Model]
+  Feat --> PremModel[Premium Model]
+  RiskModel --> Score[Risk Score]
+  PremModel --> Quote[Premium Quote]
+  Score --> PolicyAPI[Policy API]
+  Quote --> PolicyAPI
+  PolicyAPI --> RiderApp[Rider App Quote Screen]
+  PolicyAPI --> AdminDash[Admin Dashboard Controls]
+```
+
+## Fraud Core Diagram
+
+This diagram shows how fraud checks are combined into a final claim decision.
+
+```mermaid
+flowchart LR
+  Claim[Claim Submitted] --> Ctx[Claim Context Loader]
+  Ctx --> Loc[Location Validity Check]
+  Ctx --> Trig[Trigger Evidence Check]
+  Ctx --> Dup[Duplicate/Frequency Check]
+  Ctx --> Beh[Behavior Pattern Check]
+  Loc --> Agg[Fraud Signal Aggregator]
+  Trig --> Agg
+  Dup --> Agg
+  Beh --> Agg
+  Agg --> Decision{Risk Level}
+  Decision -- Low --> Approve[Auto Approve]
+  Decision -- Medium --> Review[Manual Review Queue]
+  Decision -- High --> Reject[Reject + Reason]
+```
+
 
 
 ## Claim Processing Flow

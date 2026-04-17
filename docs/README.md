@@ -8,6 +8,7 @@ If you are reviewing quickly, start with architecture and setup first, then move
 
 - [FEATURES.md](FEATURES.md) - Feature breakdown across rider app, dashboard, and backend
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture, data flow, and agent pipeline (with Mermaid diagrams)
+  - Core diagrams: [AI Core](ARCHITECTURE.md#ai-core-diagram), [Fraud Core](ARCHITECTURE.md#fraud-core-diagram)
 - [SETUP.md](SETUP.md) - Local setup, run commands, and demo login credentials
 - [ENVIRONMENT.md](ENVIRONMENT.md) - `.env.sample` variable reference and usage guidance
 - [API.md](API.md) - API route groups and endpoint responsibilities
