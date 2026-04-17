@@ -1,8 +1,8 @@
 {
   "model_name": "fraud-random-forest-classifier",
   "version": "fraud-rf-v1",
-  "trained_at": "2026-04-15T17:38:16.096698",
-  "train_rows": 16000,
+  "trained_at": "2026-04-16T17:11:57.498032",
+  "train_rows": 14000,
   "feature_names": [
     "location_fail",
     "duplicate_fail",

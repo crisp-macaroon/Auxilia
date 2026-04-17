@@ -23,6 +23,7 @@ from app.routers import (
     weather_router,
     payments_router,
     auth_router,
+    ml_ops_router,
     route_risk
 )
 from app.agents.trigger_agent import trigger_agent
@@ -43,11 +44,67 @@ async def ensure_rider_auth_columns() -> None:
             ("vehicle_type", "ALTER TABLE riders ADD COLUMN vehicle_type VARCHAR(30)"),
             ("shift_type", "ALTER TABLE riders ADD COLUMN shift_type VARCHAR(30)"),
             ("tenure_months", "ALTER TABLE riders ADD COLUMN tenure_months INTEGER DEFAULT 0"),
+            ("earning_model", "ALTER TABLE riders ADD COLUMN earning_model VARCHAR(30) DEFAULT 'per_delivery'"),
+            ("avg_order_value", "ALTER TABLE riders ADD COLUMN avg_order_value FLOAT DEFAULT 120.0"),
+            ("avg_hourly_income", "ALTER TABLE riders ADD COLUMN avg_hourly_income FLOAT DEFAULT 180.0"),
+            ("avg_daily_orders", "ALTER TABLE riders ADD COLUMN avg_daily_orders INTEGER DEFAULT 12"),
+            ("avg_km_rate", "ALTER TABLE riders ADD COLUMN avg_km_rate FLOAT DEFAULT 18.0"),
+            ("loyalty_points", "ALTER TABLE riders ADD COLUMN loyalty_points INTEGER DEFAULT 0"),
         ]
         for column_name, statement in statements:
             try:
                 await conn.exec_driver_sql(statement)
                 logger.info("Added riders.%s column", column_name)
+            except Exception:
+                pass
+
+
+async def ensure_delivery_checkin_table() -> None:
+    async with engine.begin() as conn:
+        try:
+            await conn.exec_driver_sql(
+                """
+                CREATE TABLE IF NOT EXISTS delivery_checkin_events (
+                    id VARCHAR(36) PRIMARY KEY,
+                    rider_id VARCHAR(36) NOT NULL,
+                    order_id VARCHAR(100),
+                    assigned_zone_id VARCHAR(50) NOT NULL,
+                    assigned_zone_name VARCHAR(100),
+                    delivery_latitude FLOAT NOT NULL,
+                    delivery_longitude FLOAT NOT NULL,
+                    rider_latitude FLOAT,
+                    rider_longitude FLOAT,
+                    distance_to_zone_center_meters FLOAT,
+                    is_delivery_in_coverage_zone BOOLEAN DEFAULT FALSE,
+                    eligibility_reason TEXT,
+                    computed_risk_score FLOAT DEFAULT 0.0,
+                    weather_risk FLOAT DEFAULT 0.0,
+                    traffic_risk FLOAT DEFAULT 0.0,
+                    incident_risk FLOAT DEFAULT 0.0,
+                    assessed_at TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(rider_id) REFERENCES riders(id)
+                )
+                """
+            )
+            await conn.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS idx_delivery_checkins_rider ON delivery_checkin_events (rider_id)"
+            )
+            logger.info("Ensured delivery_checkin_events table")
+        except Exception:
+            pass
+
+
+async def ensure_policy_loyalty_columns() -> None:
+    async with engine.begin() as conn:
+        statements = [
+            ("loyalty_points_awarded", "ALTER TABLE policies ADD COLUMN loyalty_points_awarded BOOLEAN DEFAULT FALSE"),
+            ("loyalty_points_awarded_at", "ALTER TABLE policies ADD COLUMN loyalty_points_awarded_at TIMESTAMP"),
+        ]
+        for column_name, statement in statements:
+            try:
+                await conn.exec_driver_sql(statement)
+                logger.info("Added policies.%s column", column_name)
             except Exception:
                 pass
 
@@ -65,7 +122,14 @@ async def lifespan(app: FastAPI):
     # Create database tables
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        try:
+            await conn.exec_driver_sql("ALTER TABLE zones ADD COLUMN earning_index FLOAT DEFAULT 1.0")
+            logger.info("Added zones.earning_index column")
+        except Exception:
+            pass
     await ensure_rider_auth_columns()
+    await ensure_delivery_checkin_table()
+    await ensure_policy_loyalty_columns()
     logger.info("Database tables created")
     
     # Start trigger agent polling in background
@@ -139,6 +203,7 @@ app.include_router(dashboard_router, prefix="/api/v1")
 app.include_router(weather_router, prefix="/api/v1")
 app.include_router(payments_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
+app.include_router(ml_ops_router, prefix="/api/v1")
 app.include_router(route_risk.router, prefix="/api/v1")
 
 

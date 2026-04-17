@@ -1,20 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/theme.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/providers/providers.dart';
 
 /// Home screen with bottom navigation shell
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   final Widget child;
 
   const HomeScreen({super.key, required this.child});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _currentIndex = 0;
 
   void _onItemTapped(int index) {
@@ -37,6 +39,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(locationSyncProvider);
+    ref.watch(backgroundLocationSyncProvider);
+
     return Scaffold(
       body: widget.child,
       bottomNavigationBar: Container(

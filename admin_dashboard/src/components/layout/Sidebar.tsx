@@ -19,7 +19,7 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Policies', href: '/policies', icon: FileText },
   { name: 'Claims', href: '/claims', icon: ClipboardList },
   { name: 'Riders', href: '/riders', icon: Users },
@@ -48,7 +48,7 @@ export function Sidebar() {
     >
       {/* Logo */}
       <div className="flex h-16 items-center justify-between border-b border-slate-200 px-4">
-        <Link href="/" className="flex items-center gap-3">
+        <Link href="/dashboard" className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 shadow-lg">
             <Shield className="h-6 w-6 text-white" />
           </div>

@@ -11,16 +11,19 @@ import uuid
 
 from app.core.database import get_db
 from app.models.database import Rider, Policy, Claim
+from app.models.database import DeliveryCheckInEvent
 from app.models.schemas import (
     RiderCreate, RiderUpdate, RiderResponse,
     PersonaType, RiderStatus, APIResponse,
     DeliveryCheckInRequest, DeliveryCheckInResponse,
+    DeliveryHistoryItem,
 )
 from app.agents.risk_agent import risk_agent
 from app.services.location_service import location_service
 from app.models.database import Zone
 from app.core.config import settings
 from app.core.security import require_admin
+from app.routers.zones import _default_earning_index
 
 router = APIRouter(prefix="/riders", tags=["Riders"])
 
@@ -31,6 +34,11 @@ def _build_rider_profile(rider: Rider | RiderCreate | RiderUpdate) -> dict:
         "vehicle_type": getattr(rider, "vehicle_type", None),
         "shift_type": getattr(rider, "shift_type", None),
         "tenure_months": getattr(rider, "tenure_months", 0) or 0,
+        "earning_model": getattr(rider, "earning_model", "per_delivery") or "per_delivery",
+        "avg_order_value": getattr(rider, "avg_order_value", 120.0) or 120.0,
+        "avg_hourly_income": getattr(rider, "avg_hourly_income", 180.0) or 180.0,
+        "avg_daily_orders": getattr(rider, "avg_daily_orders", 12) or 12,
+        "avg_km_rate": getattr(rider, "avg_km_rate", 18.0) or 18.0,
     }
 
 
@@ -69,6 +77,11 @@ async def create_rider(
         vehicle_type=rider.vehicle_type,
         shift_type=rider.shift_type,
         tenure_months=rider.tenure_months,
+        earning_model=rider.earning_model,
+        avg_order_value=rider.avg_order_value,
+        avg_hourly_income=rider.avg_hourly_income,
+        avg_daily_orders=rider.avg_daily_orders,
+        avg_km_rate=rider.avg_km_rate,
         latitude=rider.latitude,
         longitude=rider.longitude,
         risk_score=risk_assessment.final_risk_score,
@@ -337,6 +350,7 @@ async def delivery_checkin(
                 radius_km=settings.DELIVERY_ZONE_MAX_RADIUS_KM,
                 risk_level="medium",
                 base_premium_factor=1.0,
+                earning_index=_default_earning_index(zone_id, dynamic_city),
                 is_active=True,
                 created_at=datetime.utcnow(),
             )
@@ -405,6 +419,29 @@ async def delivery_checkin(
         else f"Delivery is outside {assigned_zone.name} radius"
     )
 
+    checkin_event = DeliveryCheckInEvent(
+        id=str(uuid.uuid4()),
+        rider_id=rider.id,
+        order_id=payload.order_id,
+        assigned_zone_id=assigned_zone.id,
+        assigned_zone_name=assigned_zone.name,
+        delivery_latitude=payload.delivery_latitude,
+        delivery_longitude=payload.delivery_longitude,
+        rider_latitude=payload.rider_latitude,
+        rider_longitude=payload.rider_longitude,
+        distance_to_zone_center_meters=round(min_distance or 0.0, 2),
+        is_delivery_in_coverage_zone=in_zone,
+        eligibility_reason=reason,
+        computed_risk_score=assessment.final_risk_score,
+        weather_risk=assessment.weather_risk,
+        traffic_risk=assessment.traffic_risk,
+        incident_risk=assessment.incident_risk,
+        assessed_at=assessment.assessed_at,
+        created_at=datetime.utcnow(),
+    )
+    db.add(checkin_event)
+    await db.commit()
+
     return DeliveryCheckInResponse(
         rider_id=rider.id,
         order_id=payload.order_id,
@@ -419,6 +456,21 @@ async def delivery_checkin(
         incident_risk=assessment.incident_risk,
         assessed_at=assessment.assessed_at,
     )
+
+
+@router.get("/{rider_id}/delivery-history", response_model=List[DeliveryHistoryItem])
+async def get_delivery_history(
+    rider_id: str,
+    limit: int = Query(30, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(DeliveryCheckInEvent)
+        .where(DeliveryCheckInEvent.rider_id == rider_id)
+        .order_by(DeliveryCheckInEvent.created_at.desc())
+        .limit(limit)
+    )
+    return result.scalars().all()
 
 
 @router.get("/stats/overview")

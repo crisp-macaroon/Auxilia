@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:async';
 import 'dart:math' as math;
 import '../services/api_service.dart';
 import '../../shared/models/models.dart';
@@ -170,6 +172,7 @@ class OnboardingState {
   final String? persona;
   final String? zoneId;
   final Zone? selectedZone;
+  final bool purchaseLater;
 
   OnboardingState({
     this.name,
@@ -179,6 +182,7 @@ class OnboardingState {
     this.persona,
     this.zoneId,
     this.selectedZone,
+    this.purchaseLater = false,
   });
 
   OnboardingState copyWith({
@@ -189,6 +193,7 @@ class OnboardingState {
     String? persona,
     String? zoneId,
     Zone? selectedZone,
+    bool? purchaseLater,
   }) {
     return OnboardingState(
       name: name ?? this.name,
@@ -198,11 +203,16 @@ class OnboardingState {
       persona: persona ?? this.persona,
       zoneId: zoneId ?? this.zoneId,
       selectedZone: selectedZone ?? this.selectedZone,
+      purchaseLater: purchaseLater ?? this.purchaseLater,
     );
   }
 
   bool get isComplete =>
-      name != null && phone != null && password != null && persona != null && zoneId != null;
+      name != null &&
+      phone != null &&
+      password != null &&
+      persona != null &&
+      zoneId != null;
 }
 
 class OnboardingNotifier extends StateNotifier<OnboardingState> {
@@ -221,11 +231,20 @@ class OnboardingNotifier extends StateNotifier<OnboardingState> {
     required String password,
     String? email,
   }) {
-    state = state.copyWith(name: name, phone: phone, password: password, email: email);
+    state = state.copyWith(
+      name: name,
+      phone: phone,
+      password: password,
+      email: email,
+    );
   }
 
   void setZone(Zone zone) {
     state = state.copyWith(zoneId: zone.id, selectedZone: zone);
+  }
+
+  void setPurchaseLater(bool value) {
+    state = state.copyWith(purchaseLater: value);
   }
 
   Future<ApiResponse<RiderAuthSession>> register() async {
@@ -337,13 +356,34 @@ final locationTrackingProvider = StreamProvider<Position>((ref) async* {
   );
   yield initialPosition;
 
-  // Then stream updates
-  yield* Geolocator.getPositionStream(
-    locationSettings: const LocationSettings(
-      accuracy: LocationAccuracy.high,
-      distanceFilter: 50,
-    ),
+  // Then stream updates (background-friendly settings)
+  LocationSettings locationSettings = const LocationSettings(
+    accuracy: LocationAccuracy.best,
+    distanceFilter: 15,
   );
+
+  if (defaultTargetPlatform == TargetPlatform.android) {
+    locationSettings = AndroidSettings(
+      accuracy: LocationAccuracy.bestForNavigation,
+      distanceFilter: 15,
+      intervalDuration: Duration(seconds: 30),
+      foregroundNotificationConfig: ForegroundNotificationConfig(
+        notificationTitle: 'Auxilia tracking active',
+        notificationText: 'Live route protection is running in background.',
+        enableWakeLock: true,
+      ),
+    );
+  } else if (defaultTargetPlatform == TargetPlatform.iOS) {
+    locationSettings = AppleSettings(
+      accuracy: LocationAccuracy.bestForNavigation,
+      distanceFilter: 15,
+      activityType: ActivityType.automotiveNavigation,
+      pauseLocationUpdatesAutomatically: false,
+      showBackgroundLocationIndicator: true,
+    );
+  }
+
+  yield* Geolocator.getPositionStream(locationSettings: locationSettings);
 });
 
 final architectureProvider = FutureProvider<Map<String, dynamic>>((ref) async {
@@ -450,6 +490,33 @@ final locationSyncProvider = Provider<void>((ref) {
   });
 });
 
+final backgroundLocationSyncProvider = Provider<void>((ref) {
+  DateTime? lastSyncedAt;
+
+  ref.listen<AsyncValue<Position>>(locationTrackingProvider, (_, next) {
+    next.whenData((position) {
+      final now = DateTime.now();
+      if (lastSyncedAt != null &&
+          now.difference(lastSyncedAt!).inSeconds < 30) {
+        return;
+      }
+
+      unawaited(() async {
+        final rider = await ref.read(currentRiderProvider.future);
+        if (rider == null) return;
+
+        final api = ref.read(apiServiceProvider);
+        await api.updateRiderLocation(
+          riderId: rider.id,
+          latitude: position.latitude,
+          longitude: position.longitude,
+        );
+        lastSyncedAt = now;
+      }());
+    });
+  });
+});
+
 final zoneHeatmapProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   final api = ref.watch(apiServiceProvider);
   final response = await api.getZoneHeatmap();
@@ -520,6 +587,56 @@ final claimHistoryProvider = FutureProvider<List<Claim>>((ref) async {
 
   final api = ref.watch(apiServiceProvider);
   final response = await api.getRiderClaimHistory(riderId);
+  if (response.success && response.data != null) return response.data!;
+  return [];
+});
+
+final publicPayoutLogProvider = FutureProvider<List<PublicPayoutLogEntry>>((
+  ref,
+) async {
+  final api = ref.watch(apiServiceProvider);
+  final response = await api.getPublicPayoutLog(limit: 20);
+  if (response.success && response.data != null) return response.data!;
+  return [];
+});
+
+final trustRulesProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final api = ref.watch(apiServiceProvider);
+  final response = await api.getTrustRules();
+  if (response.success && response.data != null) return response.data!;
+  return {};
+});
+
+final offerWindowProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final rider = await ref.watch(currentRiderProvider.future);
+  if (rider == null) return {};
+  final api = ref.watch(apiServiceProvider);
+  final response = await api.getOfferWindow(rider.zoneId);
+  if (response.success && response.data != null) return response.data!;
+  return {};
+});
+
+final quotePreviewProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final rider = await ref.watch(currentRiderProvider.future);
+  if (rider == null) return {};
+  final api = ref.watch(apiServiceProvider);
+  final response = await api.getQuotePreview(
+    zoneId: rider.zoneId,
+    persona: rider.persona,
+    durationDays: 7,
+  );
+  if (response.success && response.data != null) return response.data!;
+  return {};
+});
+
+final deliveryHistoryProvider = FutureProvider<List<DeliveryHistoryItem>>((
+  ref,
+) async {
+  final riderId = await ref.watch(currentRiderIdProvider.future);
+  if (riderId == null) return [];
+
+  final api = ref.watch(apiServiceProvider);
+  final response = await api.getDeliveryHistory(riderId, limit: 100);
   if (response.success && response.data != null) return response.data!;
   return [];
 });

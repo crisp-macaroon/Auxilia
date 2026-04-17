@@ -54,6 +54,11 @@ async def rider_register(payload: RiderRegisterRequest, db: AsyncSession = Depen
             "vehicle_type": payload.vehicle_type,
             "shift_type": payload.shift_type,
             "tenure_months": payload.tenure_months,
+            "earning_model": payload.earning_model,
+            "avg_order_value": payload.avg_order_value,
+            "avg_hourly_income": payload.avg_hourly_income,
+            "avg_daily_orders": payload.avg_daily_orders,
+            "avg_km_rate": payload.avg_km_rate,
         },
     )
 
@@ -69,6 +74,11 @@ async def rider_register(payload: RiderRegisterRequest, db: AsyncSession = Depen
         vehicle_type=payload.vehicle_type,
         shift_type=payload.shift_type,
         tenure_months=payload.tenure_months,
+        earning_model=payload.earning_model,
+        avg_order_value=payload.avg_order_value,
+        avg_hourly_income=payload.avg_hourly_income,
+        avg_daily_orders=payload.avg_daily_orders,
+        avg_km_rate=payload.avg_km_rate,
         latitude=payload.latitude,
         longitude=payload.longitude,
         risk_score=risk_assessment.final_risk_score,

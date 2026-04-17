@@ -32,6 +32,57 @@ TRIGGER_THRESHOLDS = {
 }
 
 
+@router.get("/public-payout-log")
+async def get_public_payout_log(
+    limit: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    """Public, anonymized payout log for transparency and trust."""
+    result = await db.execute(
+        select(Claim)
+        .where(Claim.status == ClaimStatus.PAID.value)
+        .order_by(Claim.processed_at.desc(), Claim.created_at.desc())
+        .limit(limit)
+    )
+    paid_claims = result.scalars().all()
+
+    rows = []
+    for claim in paid_claims:
+        rider_result = await db.execute(select(Rider).where(Rider.id == claim.rider_id))
+        rider = rider_result.scalar_one_or_none()
+
+        policy_result = await db.execute(select(Policy).where(Policy.id == claim.policy_id))
+        policy = policy_result.scalar_one_or_none()
+
+        zone_name = None
+        if policy:
+            zone_result = await db.execute(select(Zone).where(Zone.id == policy.zone_id))
+            zone = zone_result.scalar_one_or_none()
+            zone_name = zone.name if zone else policy.zone_id
+
+        masked_rider = "Rider"
+        if rider and rider.name:
+            masked_rider = f"{rider.name[0]}***"
+
+        rows.append({
+            "claim_id": claim.id,
+            "rider": masked_rider,
+            "trigger_type": claim.trigger_type,
+            "trigger_value": round(float(claim.trigger_value or 0.0), 2),
+            "threshold": round(float(claim.threshold or 0.0), 2),
+            "payout_amount": round(float(claim.amount or 0.0), 2),
+            "zone": zone_name,
+            "tx_hash": claim.tx_hash,
+            "processed_at": (claim.processed_at or claim.created_at).isoformat(),
+        })
+
+    return {
+        "count": len(rows),
+        "payouts": rows,
+        "note": "Anonymized parametric payout events with verifiable transaction hash.",
+    }
+
+
 @router.post("/", response_model=ClaimResponse)
 async def create_claim(
     claim: ClaimCreate,
@@ -207,6 +258,14 @@ async def process_claim_async(
                 trigger_value=trigger_value,
                 threshold=threshold,
                 coverage_amount=policy.coverage,
+                zone_earning_index=float(getattr(zone, "earning_index", 1.0) or 1.0),
+                rider_earning_profile={
+                    "earning_model": getattr(rider, "earning_model", "per_delivery"),
+                    "avg_order_value": getattr(rider, "avg_order_value", 120.0),
+                    "avg_hourly_income": getattr(rider, "avg_hourly_income", 180.0),
+                    "avg_daily_orders": getattr(rider, "avg_daily_orders", 12),
+                    "avg_km_rate": getattr(rider, "avg_km_rate", 18.0),
+                },
                 fraud_score=fraud_assessment.fraud_score,
                 policy_valid=True
             )
@@ -313,13 +372,28 @@ async def get_claim_details(
     
     # Get fraud assessment if available
     fraud_assessment = fraud_agent.get_cached_assessment(claim_id)
+    payout_decision = await payout_agent.get_payout_status(claim_id)
+    earning_context = None
+    if rider or zone:
+        earning_context = payout_agent.get_earning_exposure_details(
+            zone_earning_index=float(getattr(zone, "earning_index", 1.0) or 1.0),
+            rider_earning_profile={
+                "earning_model": getattr(rider, "earning_model", "per_delivery") if rider else "per_delivery",
+                "avg_order_value": getattr(rider, "avg_order_value", 120.0) if rider else 120.0,
+                "avg_hourly_income": getattr(rider, "avg_hourly_income", 180.0) if rider else 180.0,
+                "avg_daily_orders": getattr(rider, "avg_daily_orders", 12) if rider else 12,
+                "avg_km_rate": getattr(rider, "avg_km_rate", 18.0) if rider else 18.0,
+            },
+        )
     
     return {
         "claim": claim,
         "policy": policy,
         "rider": rider,
         "zone": zone,
-        "fraud_assessment": fraud_assessment.model_dump() if fraud_assessment else None
+        "fraud_assessment": fraud_assessment.model_dump() if fraud_assessment else None,
+        "payout_decision": payout_decision.model_dump() if payout_decision else None,
+        "earning_context": earning_context,
     }
 
 

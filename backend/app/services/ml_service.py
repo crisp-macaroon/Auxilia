@@ -176,10 +176,11 @@ class RiskModelService:
 
         model = GradientBoostingRegressor(
             random_state=42,
-            n_estimators=260,
+            n_estimators=420,
             max_depth=3,
-            learning_rate=0.05,
-            min_samples_leaf=20,
+            learning_rate=0.04,
+            min_samples_leaf=10,
+            subsample=0.9,
         )
         model.fit(X, y)
 
@@ -524,11 +525,11 @@ class FraudModelService:
 
         model = RandomForestClassifier(
             random_state=44,
-            n_estimators=260,
-            max_depth=11,
+            n_estimators=420,
+            max_depth=14,
             min_samples_leaf=8,
             n_jobs=-1,
-            class_weight="balanced",
+            class_weight=None,
         )
         model.fit(X, y)
 

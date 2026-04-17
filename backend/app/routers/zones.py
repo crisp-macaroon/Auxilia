@@ -19,6 +19,42 @@ from app.services.location_service import location_service
 router = APIRouter(prefix="/zones", tags=["Zones"])
 
 
+CITY_EARNING_INDEX = {
+    "mumbai": 1.18,
+    "delhi": 1.16,
+    "gurgaon": 1.14,
+    "bengaluru": 1.12,
+    "bangalore": 1.12,
+    "hyderabad": 1.04,
+    "pune": 1.0,
+    "chennai": 0.98,
+    "kochi": 0.92,
+    "thiruvananthapuram": 0.9,
+    "kerala": 0.9,
+}
+
+ZONE_EARNING_INDEX = {
+    "MUM-AND": 1.22,
+    "MUM-BAN": 1.24,
+    "MUM-POW": 1.15,
+    "DEL-CON": 1.2,
+    "DEL-GUR": 1.18,
+    "BLR-KOR": 1.14,
+    "BLR-IND": 1.15,
+    "BLR-WHT": 1.08,
+    "BLR-HSR": 1.1,
+    "HYD-HIB": 1.06,
+    "PUN-KOT": 1.01,
+    "CHN-ANN": 0.99,
+}
+
+
+def _default_earning_index(zone_id: str, city: str) -> float:
+    if zone_id in ZONE_EARNING_INDEX:
+        return ZONE_EARNING_INDEX[zone_id]
+    return CITY_EARNING_INDEX.get((city or "").strip().lower(), 1.0)
+
+
 @router.post("/", response_model=ZoneResponse)
 async def create_zone(
     zone: ZoneCreate,
@@ -43,6 +79,7 @@ async def create_zone(
         radius_km=zone.radius_km,
         risk_level=zone.risk_level,
         base_premium_factor=zone.base_premium_factor,
+        earning_index=zone.earning_index if zone.earning_index else _default_earning_index(zone.id, zone.city),
         is_active=True,
         created_at=datetime.utcnow()
     )
@@ -88,6 +125,7 @@ async def create_dynamic_insurer_zone(
         radius_km=payload.radius_km,
         risk_level=payload.risk_level,
         base_premium_factor=1.0,
+        earning_index=payload.earning_index or _default_earning_index(zone_id, zone_city),
         is_active=True,
         created_at=datetime.utcnow(),
     )
@@ -250,6 +288,7 @@ async def update_zone(
     zone_id: str,
     risk_level: Optional[str] = None,
     base_premium_factor: Optional[float] = None,
+    earning_index: Optional[float] = None,
     is_active: Optional[bool] = None,
     db: AsyncSession = Depends(get_db)
 ):
@@ -266,6 +305,8 @@ async def update_zone(
         zone.risk_level = risk_level
     if base_premium_factor is not None:
         zone.base_premium_factor = base_premium_factor
+    if earning_index is not None:
+        zone.earning_index = earning_index
     if is_active is not None:
         zone.is_active = is_active
     
@@ -315,6 +356,7 @@ async def seed_zones(db: AsyncSession = Depends(get_db)):
             radius_km=5.0,
             risk_level="medium",
             base_premium_factor=1.0,
+            earning_index=_default_earning_index(zone_id, zone_config["city"]),
             is_active=True,
             created_at=datetime.utcnow()
         )

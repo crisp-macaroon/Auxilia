@@ -52,6 +52,12 @@ class Rider(Base):
     vehicle_type = Column(String(30), nullable=True)
     shift_type = Column(String(30), nullable=True)
     tenure_months = Column(Integer, default=0)
+    earning_model = Column(String(30), default="per_delivery")
+    avg_order_value = Column(Float, default=120.0)
+    avg_hourly_income = Column(Float, default=180.0)
+    avg_daily_orders = Column(Integer, default=12)
+    avg_km_rate = Column(Float, default=18.0)
+    loyalty_points = Column(Integer, default=0)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
     risk_score = Column(Float, default=0.5)
@@ -62,6 +68,11 @@ class Rider(Base):
     # Relationships
     policies = relationship("Policy", back_populates="rider", cascade="all, delete-orphan")
     claims = relationship("Claim", back_populates="rider", cascade="all, delete-orphan")
+    delivery_checkins = relationship(
+        "DeliveryCheckInEvent",
+        back_populates="rider",
+        cascade="all, delete-orphan",
+    )
 
 
 class Zone(Base):
@@ -77,6 +88,7 @@ class Zone(Base):
     radius_km = Column(Float, default=5.0)
     risk_level = Column(String(20), default="medium")  # low, medium, high
     base_premium_factor = Column(Float, default=1.0)
+    earning_index = Column(Float, default=1.0)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
@@ -98,6 +110,8 @@ class Policy(Base):
     end_date = Column(DateTime(timezone=True), nullable=False)
     status = Column(Enum(PolicyStatus), default=PolicyStatus.ACTIVE, index=True)
     tx_hash = Column(String(100), nullable=True)
+    loyalty_points_awarded = Column(Boolean, default=False)
+    loyalty_points_awarded_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
@@ -164,3 +178,28 @@ class Transaction(Base):
     status = Column(String(20), default="pending")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     confirmed_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class DeliveryCheckInEvent(Base):
+    __tablename__ = "delivery_checkin_events"
+
+    id = Column(String(36), primary_key=True)
+    rider_id = Column(String(36), ForeignKey("riders.id"), nullable=False, index=True)
+    order_id = Column(String(100), nullable=True)
+    assigned_zone_id = Column(String(50), nullable=False, index=True)
+    assigned_zone_name = Column(String(100), nullable=True)
+    delivery_latitude = Column(Float, nullable=False)
+    delivery_longitude = Column(Float, nullable=False)
+    rider_latitude = Column(Float, nullable=True)
+    rider_longitude = Column(Float, nullable=True)
+    distance_to_zone_center_meters = Column(Float, nullable=True)
+    is_delivery_in_coverage_zone = Column(Boolean, default=False)
+    eligibility_reason = Column(Text, nullable=True)
+    computed_risk_score = Column(Float, default=0.0)
+    weather_risk = Column(Float, default=0.0)
+    traffic_risk = Column(Float, default=0.0)
+    incident_risk = Column(Float, default=0.0)
+    assessed_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    rider = relationship("Rider", back_populates="delivery_checkins")

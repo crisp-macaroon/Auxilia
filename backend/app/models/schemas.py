@@ -37,6 +37,12 @@ class RiderStatus(str, Enum):
     SUSPENDED = "suspended"
 
 
+class EarningModel(str, Enum):
+    PER_DELIVERY = "per_delivery"
+    PER_KM = "per_km"
+    HOURLY = "hourly"
+
+
 # Rider Schemas
 class RiderCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=100)
@@ -47,7 +53,12 @@ class RiderCreate(BaseModel):
     age_band: Optional[str] = None
     vehicle_type: Optional[str] = None
     shift_type: Optional[str] = None
-    tenure_months: int = 0
+    tenure_months: int = Field(default=0, ge=0, le=600)
+    earning_model: EarningModel = EarningModel.PER_DELIVERY
+    avg_order_value: float = Field(default=120.0, gt=0, le=5000)
+    avg_hourly_income: float = Field(default=180.0, gt=0, le=5000)
+    avg_daily_orders: int = Field(default=12, ge=1, le=200)
+    avg_km_rate: float = Field(default=18.0, gt=0, le=500)
     latitude: Optional[float] = None
     longitude: Optional[float] = None
 
@@ -60,7 +71,12 @@ class RiderUpdate(BaseModel):
     age_band: Optional[str] = None
     vehicle_type: Optional[str] = None
     shift_type: Optional[str] = None
-    tenure_months: Optional[int] = None
+    tenure_months: Optional[int] = Field(default=None, ge=0, le=600)
+    earning_model: Optional[EarningModel] = None
+    avg_order_value: Optional[float] = Field(default=None, gt=0, le=5000)
+    avg_hourly_income: Optional[float] = Field(default=None, gt=0, le=5000)
+    avg_daily_orders: Optional[int] = Field(default=None, ge=1, le=200)
+    avg_km_rate: Optional[float] = Field(default=None, gt=0, le=500)
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     status: Optional[RiderStatus] = None
@@ -76,7 +92,13 @@ class RiderResponse(BaseModel):
     age_band: Optional[str]
     vehicle_type: Optional[str]
     shift_type: Optional[str]
-    tenure_months: int = 0
+    tenure_months: int = Field(default=0, ge=0, le=600)
+    earning_model: EarningModel = EarningModel.PER_DELIVERY
+    avg_order_value: float = Field(default=120.0, gt=0, le=5000)
+    avg_hourly_income: float = Field(default=180.0, gt=0, le=5000)
+    avg_daily_orders: int = Field(default=12, ge=1, le=200)
+    avg_km_rate: float = Field(default=18.0, gt=0, le=500)
+    loyalty_points: int = 0
     latitude: Optional[float]
     longitude: Optional[float]
     risk_score: float
@@ -110,6 +132,30 @@ class DeliveryCheckInResponse(BaseModel):
     assessed_at: datetime
 
 
+class DeliveryHistoryItem(BaseModel):
+    id: str
+    rider_id: str
+    order_id: Optional[str] = None
+    assigned_zone_id: str
+    assigned_zone_name: Optional[str] = None
+    delivery_latitude: float
+    delivery_longitude: float
+    rider_latitude: Optional[float] = None
+    rider_longitude: Optional[float] = None
+    distance_to_zone_center_meters: Optional[float] = None
+    is_delivery_in_coverage_zone: bool
+    eligibility_reason: str
+    computed_risk_score: float
+    weather_risk: float
+    traffic_risk: float
+    incident_risk: float
+    assessed_at: Optional[datetime] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class RouteRiskRequest(BaseModel):
     rider_latitude: float
     rider_longitude: float
@@ -123,6 +169,7 @@ class RouteRiskResponse(BaseModel):
     overall_risk_score: float
     risk_factors: List[str]
     epicenter_multiplier: float
+    risk_model_version: Optional[str] = None
 
 
 class LocationHistoryCreate(BaseModel):
@@ -142,7 +189,8 @@ class ZoneCreate(BaseModel):
     longitude: float
     radius_km: float = 5.0
     risk_level: str = "medium"
-    base_premium_factor: float = 1.0
+    base_premium_factor: float = Field(default=1.0, gt=0.5, le=3.0)
+    earning_index: float = Field(default=1.0, gt=0.5, le=2.0)
 
 
 class InsurerZoneCreate(BaseModel):
@@ -153,8 +201,9 @@ class InsurerZoneCreate(BaseModel):
     country: str = "IN"
     latitude: float
     longitude: float
-    radius_km: float = 3.0
+    radius_km: float = Field(default=3.0, gt=0.1, le=100.0)
     risk_level: str = "medium"
+    earning_index: float = Field(default=1.0, gt=0.5, le=2.0)
 
 
 class ZoneResponse(BaseModel):
@@ -166,6 +215,7 @@ class ZoneResponse(BaseModel):
     radius_km: float
     risk_level: str
     base_premium_factor: float
+    earning_index: float
     is_active: bool
     
     class Config:
@@ -413,6 +463,9 @@ class PayoutDecision(BaseModel):
     trigger_verification: bool
     fraud_check_passed: bool
     policy_valid: bool
+    earning_exposure_multiplier: float = 1.0
+    zone_earning_index: float = 1.0
+    rider_earning_factor: float = 1.0
     blockchain_tx_hash: Optional[str] = None
     decided_at: datetime
 
@@ -429,6 +482,7 @@ class PolicyPaymentOrderRequest(BaseModel):
     persona: Optional[PersonaType] = None
     duration_days: int = Field(default=7, ge=1, le=52)
     existing_policy_id: Optional[str] = None
+    points_to_redeem: int = Field(default=0, ge=0, le=10000)
 
 
 class PolicyPaymentOrderResponse(BaseModel):
@@ -442,6 +496,13 @@ class PolicyPaymentOrderResponse(BaseModel):
     persona: PersonaType
     duration_days: int
     premium: float
+    gst_amount: float = 0.0
+    gross_amount: float = 0.0
+    points_redeemed: int = 0
+    points_value: float = 0.0
+    net_payable: float = 0.0
+    loyalty_balance_after_redemption: int = 0
+    no_claim_loyalty_points_estimate: int = 0
     coverage: float
     flow_type: PaymentFlowType
     notes: dict = {}
@@ -458,6 +519,7 @@ class PolicyPaymentConfirmRequest(BaseModel):
     persona: Optional[PersonaType] = None
     duration_days: int = Field(default=7, ge=1, le=52)
     existing_policy_id: Optional[str] = None
+    points_to_redeem: int = Field(default=0, ge=0, le=10000)
 
 
 # Agent Schemas
@@ -559,7 +621,12 @@ class RiderRegisterRequest(BaseModel):
     age_band: Optional[str] = None
     vehicle_type: Optional[str] = None
     shift_type: Optional[str] = None
-    tenure_months: int = 0
+    tenure_months: int = Field(default=0, ge=0, le=600)
+    earning_model: EarningModel = EarningModel.PER_DELIVERY
+    avg_order_value: float = Field(default=120.0, gt=0, le=5000)
+    avg_hourly_income: float = Field(default=180.0, gt=0, le=5000)
+    avg_daily_orders: int = Field(default=12, ge=1, le=200)
+    avg_km_rate: float = Field(default=18.0, gt=0, le=500)
     latitude: Optional[float] = None
     longitude: Optional[float] = None
 

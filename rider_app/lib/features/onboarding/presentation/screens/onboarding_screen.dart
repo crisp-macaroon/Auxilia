@@ -1,17 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/theme.dart';
 import '../../../../core/constants/constants.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/providers/providers.dart';
+import '../../../../shared/models/models.dart';
 
 /// Welcome/Onboarding intro screen
-class OnboardingScreen extends StatelessWidget {
+class OnboardingScreen extends ConsumerWidget {
   const OnboardingScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final payoutLogAsync = ref.watch(publicPayoutLogProvider);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -107,6 +112,17 @@ class OnboardingScreen extends StatelessWidget {
                 AppColors.secondary,
               ).animate(delay: 600.ms).fadeIn().slideX(begin: -0.1),
 
+              const SizedBox(height: 10),
+
+              payoutLogAsync
+                  .when(
+                    data: (entries) => _PayoutLogPreview(entries: entries),
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, _) => const SizedBox.shrink(),
+                  )
+                  .animate(delay: 650.ms)
+                  .fadeIn(duration: 300.ms),
+
               const Spacer(),
 
               // Get Started Button
@@ -145,6 +161,16 @@ class OnboardingScreen extends StatelessWidget {
 
               const SizedBox(height: 16),
 
+              OutlinedButton(
+                onPressed: () {
+                  ref.read(onboardingProvider.notifier).setPurchaseLater(true);
+                  context.go(AppRoutes.home);
+                },
+                child: const Text('I will buy protection later'),
+              ).animate(delay: 740.ms).fadeIn(duration: 300.ms),
+
+              const SizedBox(height: 8),
+
               TextButton(
                 onPressed: () => context.go(AppRoutes.login),
                 child: Text(
@@ -181,6 +207,48 @@ class OnboardingScreen extends StatelessWidget {
               text,
               style: AppTypography.bodyMedium.copyWith(
                 color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PayoutLogPreview extends StatelessWidget {
+  final List<PublicPayoutLogEntry> entries;
+
+  const _PayoutLogPreview({required this.entries});
+
+  @override
+  Widget build(BuildContext context) {
+    if (entries.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final top = entries.take(2).toList();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Public payout log', style: AppTypography.labelLarge),
+          const SizedBox(height: 6),
+          ...top.map(
+            (entry) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                '${entry.rider} • ${entry.triggerType} • Rs ${entry.payoutAmount.toStringAsFixed(0)}',
+                style: AppTypography.bodySmall.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
             ),
           ),

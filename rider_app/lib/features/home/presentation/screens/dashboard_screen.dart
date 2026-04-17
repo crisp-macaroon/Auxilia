@@ -22,8 +22,10 @@ class DashboardScreen extends ConsumerWidget {
     final claimsSummaryAsync = ref.watch(claimsSummaryProvider);
     final triggersAsync = ref.watch(triggersProvider);
     final locationAsync = ref.watch(locationTrackingProvider);
+    final deliveryHistoryAsync = ref.watch(deliveryHistoryProvider);
     final heatmapAsync = ref.watch(zoneHeatmapProvider);
     final architectureAsync = ref.watch(architectureProvider);
+    final offerWindowAsync = ref.watch(offerWindowProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -78,6 +80,8 @@ class DashboardScreen extends ConsumerWidget {
               _LocationStatusCard(locationAsync: locationAsync),
               const SizedBox(height: 16),
               _DeliveryCheckInCard(),
+              const SizedBox(height: 16),
+              _DeliveryHistoryCard(historyAsync: deliveryHistoryAsync),
               const SizedBox(height: 24),
               policyAsync.when(
                 data: (policy) {
@@ -90,13 +94,15 @@ class DashboardScreen extends ConsumerWidget {
                   if (rider != null && latestPolicy != null) {
                     return const _EmptyCard(
                       title: 'Policy expired',
-                      subtitle: 'You are onboarded. Renew coverage from the Policy tab.',
+                      subtitle:
+                          'You are onboarded. Renew coverage from the Policy tab.',
                     );
                   }
 
                   return _EmptyCard(
                     title: 'No active policy yet',
-                    subtitle: 'Buy your first weekly policy to activate coverage.',
+                    subtitle:
+                        'Buy your first weekly policy to activate coverage.',
                     actionLabel: 'Buy Policy',
                     onAction: () => context.go(AppRoutes.policy),
                   );
@@ -104,7 +110,8 @@ class DashboardScreen extends ConsumerWidget {
                 loading: () => const _CardSkeleton(height: 220),
                 error: (_, _) => _EmptyCard(
                   title: 'No active policy yet',
-                  subtitle: 'Buy your first weekly policy to activate coverage.',
+                  subtitle:
+                      'Buy your first weekly policy to activate coverage.',
                   actionLabel: 'Buy Policy',
                   onAction: () => context.go(AppRoutes.policy),
                 ),
@@ -117,6 +124,51 @@ class DashboardScreen extends ConsumerWidget {
                   title: 'Heatmap unavailable',
                   subtitle: 'Start backend to render dynamic zone heat.',
                 ),
+              ),
+              const SizedBox(height: 24),
+              offerWindowAsync.when(
+                data: (offer) {
+                  if (offer.isEmpty) return const SizedBox.shrink();
+                  final highRisk = offer['high_risk_window'] == true;
+                  if (!highRisk) return const SizedBox.shrink();
+
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: AppColors.warning.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'High-risk window detected',
+                          style: AppTypography.titleSmall,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          (offer['nudge'] ?? '').toString(),
+                          style: AppTypography.bodySmall.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () => context.go(AppRoutes.policy),
+                            child: const Text('One-tap activate coverage'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                loading: () => const SizedBox.shrink(),
+                error: (_, _) => const SizedBox.shrink(),
               ),
               const SizedBox(height: 24),
               Row(
@@ -368,7 +420,7 @@ class _DeliveryCheckInCardState extends ConsumerState<_DeliveryCheckInCard> {
             'Delivery Check-in (Insurance Validation)',
             style: AppTypography.titleSmall,
           ),
-          
+
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
@@ -433,6 +485,133 @@ class _DeliveryCheckInCardState extends ConsumerState<_DeliveryCheckInCard> {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DeliveryHistoryCard extends StatelessWidget {
+  final AsyncValue<List<DeliveryHistoryItem>> historyAsync;
+
+  const _DeliveryHistoryCard({required this.historyAsync});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Past Deliveries', style: AppTypography.titleSmall),
+          const SizedBox(height: 6),
+          InkWell(
+            onTap: () => context.push(AppRoutes.deliveryHistory),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'View full history',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  size: 16,
+                  color: AppColors.primary,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          historyAsync.when(
+            data: (items) {
+              if (items.isEmpty) {
+                return Text(
+                  'No delivery history yet. Use delivery check-in to start tracking.',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                );
+              }
+
+              return Column(
+                children: items.take(8).map((item) {
+                  final time = item.createdAt;
+                  final hh = time.hour.toString().padLeft(2, '0');
+                  final mm = time.minute.toString().padLeft(2, '0');
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            item.isDeliveryInCoverageZone
+                                ? Icons.check_circle_outline
+                                : Icons.warning_amber_rounded,
+                            color: item.isDeliveryInCoverageZone
+                                ? AppColors.success
+                                : AppColors.warning,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.assignedZoneName ?? item.assignedZoneId,
+                                  style: AppTypography.labelMedium,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Risk ${(item.computedRiskScore * 100).toStringAsFixed(0)}%  •  $hh:$mm',
+                                  style: AppTypography.bodySmall.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (item.orderId != null && item.orderId!.isNotEmpty)
+                            Text(
+                              item.orderId!,
+                              style: AppTypography.bodySmall.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              );
+            },
+            loading: () => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: LinearProgressIndicator(minHeight: 2),
+            ),
+            error: (_, _) => Text(
+              'Unable to load delivery history right now.',
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
         ],
       ),
     );

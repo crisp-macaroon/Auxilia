@@ -4,10 +4,10 @@ import '../../../shared/models/models.dart';
 
 class ApiConfig {
   // Use this for physical devices on the same network
-  static const String baseUrl = 'http://192.168.1.9:8000/api/v1';
+  static const String baseUrl = 'http://20.244.41.25/api/v1';
   static const String localUrl = 'http://localhost:8000/api/v1';
   static const String emulatorUrl = 'http://10.0.2.2:8000/api/v1';
-  static const String networkUrl = 'http://192.168.1.9:8000/api/v1';
+  static const String networkUrl = 'http://20.244.41.25/api/v1';
   static const Duration timeout = Duration(seconds: 30);
 }
 
@@ -112,14 +112,18 @@ class ApiService {
     String? email,
   }) async {
     final normalizedPhone = phone.startsWith('+') ? phone : '+91$phone';
-    return post('/auth/rider/register', {
-      'name': name,
-      'phone': normalizedPhone,
-      'password': password,
-      'email': email,
-      'persona': persona,
-      'zone_id': zoneId,
-    }, (json) => RiderAuthSession.fromJson(json as Map<String, dynamic>));
+    return post(
+      '/auth/rider/register',
+      {
+        'name': name,
+        'phone': normalizedPhone,
+        'password': password,
+        'email': email,
+        'persona': persona,
+        'zone_id': zoneId,
+      },
+      (json) => RiderAuthSession.fromJson(json as Map<String, dynamic>),
+    );
   }
 
   Future<ApiResponse<RiderAuthSession>> loginRider({
@@ -127,10 +131,11 @@ class ApiService {
     required String password,
   }) async {
     final normalizedPhone = phone.startsWith('+') ? phone : '+91$phone';
-    return post('/auth/rider/login', {
-      'phone': normalizedPhone,
-      'password': password,
-    }, (json) => RiderAuthSession.fromJson(json as Map<String, dynamic>));
+    return post(
+      '/auth/rider/login',
+      {'phone': normalizedPhone, 'password': password},
+      (json) => RiderAuthSession.fromJson(json as Map<String, dynamic>),
+    );
   }
 
   Future<ApiResponse<Rider>> getRiderById(String riderId) async {
@@ -162,6 +167,62 @@ class ApiService {
     return post(
       '/riders/$riderId/update-location?latitude=$latitude&longitude=$longitude',
       {'latitude': latitude, 'longitude': longitude},
+      (json) => json as Map<String, dynamic>,
+    );
+  }
+
+  Future<ApiResponse<List<DeliveryHistoryItem>>> getDeliveryHistory(
+    String riderId, {
+    int limit = 50,
+  }) async {
+    return get(
+      '/riders/$riderId/delivery-history?limit=$limit',
+      (json) => (json as List)
+          .map(
+            (item) =>
+                DeliveryHistoryItem.fromJson(item as Map<String, dynamic>),
+          )
+          .toList(),
+    );
+  }
+
+  Future<ApiResponse<List<PublicPayoutLogEntry>>> getPublicPayoutLog({
+    int limit = 20,
+  }) async {
+    return get(
+      '/claims/public-payout-log?limit=$limit',
+      (json) => (((json as Map<String, dynamic>)['payouts'] ?? []) as List)
+          .map(
+            (item) =>
+                PublicPayoutLogEntry.fromJson(item as Map<String, dynamic>),
+          )
+          .toList(),
+    );
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> getTrustRules() async {
+    return get(
+      '/policies/trust-rules/public',
+      (json) => json as Map<String, dynamic>,
+    );
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> getOfferWindow(
+    String zoneId,
+  ) async {
+    return get(
+      '/policies/offer-window/public?zone_id=$zoneId',
+      (json) => json as Map<String, dynamic>,
+    );
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> getQuotePreview({
+    required String zoneId,
+    required String persona,
+    int durationDays = 7,
+  }) async {
+    return get(
+      '/policies/quote-preview/public?zone_id=$zoneId&persona=$persona&duration_days=$durationDays',
       (json) => json as Map<String, dynamic>,
     );
   }
@@ -211,7 +272,8 @@ class ApiService {
       return ApiResponse.failure(response.error ?? 'Failed to load policies');
     }
 
-    final policies = response.data!..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final policies = response.data!
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     if (policies.isEmpty) {
       return ApiResponse.failure('No policy found');
     }
@@ -287,14 +349,19 @@ class ApiService {
     final claims = response.data!;
     final approvedClaims = claims.where((claim) => claim.isApproved).toList();
     final paidClaims = claims.where((claim) => claim.isPaid).toList();
-    final protectedClaims = approvedClaims.isNotEmpty ? approvedClaims : paidClaims;
+    final protectedClaims = approvedClaims.isNotEmpty
+        ? approvedClaims
+        : paidClaims;
 
     return ApiResponse.success({
       'total': claims.length,
       'approved': approvedClaims.length,
       'paid': paidClaims.length,
       'settled': approvedClaims.length,
-      'amount': protectedClaims.fold<double>(0, (sum, claim) => sum + claim.amount),
+      'amount': protectedClaims.fold<double>(
+        0,
+        (sum, claim) => sum + claim.amount,
+      ),
     });
   }
 
@@ -305,6 +372,7 @@ class ApiService {
     String? persona,
     int durationDays = 7,
     String? existingPolicyId,
+    int pointsToRedeem = 0,
   }) async {
     return post('/payments/policy-order', {
       'flow_type': flowType,
@@ -313,6 +381,7 @@ class ApiService {
       'persona': persona,
       'duration_days': durationDays,
       'existing_policy_id': existingPolicyId,
+      'points_to_redeem': pointsToRedeem,
     }, (json) => json as Map<String, dynamic>);
   }
 
@@ -326,18 +395,24 @@ class ApiService {
     String? persona,
     int durationDays = 7,
     String? existingPolicyId,
+    int pointsToRedeem = 0,
   }) async {
-    return post('/payments/policy-confirm', {
-      'flow_type': flowType,
-      'order_id': orderId,
-      'payment_id': paymentId,
-      'signature': signature,
-      'rider_id': riderId,
-      'zone_id': zoneId,
-      'persona': persona,
-      'duration_days': durationDays,
-      'existing_policy_id': existingPolicyId,
-    }, (json) => Policy.fromJson(json as Map<String, dynamic>));
+    return post(
+      '/payments/policy-confirm',
+      {
+        'flow_type': flowType,
+        'order_id': orderId,
+        'payment_id': paymentId,
+        'signature': signature,
+        'rider_id': riderId,
+        'zone_id': zoneId,
+        'persona': persona,
+        'duration_days': durationDays,
+        'existing_policy_id': existingPolicyId,
+        'points_to_redeem': pointsToRedeem,
+      },
+      (json) => Policy.fromJson(json as Map<String, dynamic>),
+    );
   }
 
   Future<ApiResponse<WeatherData>> getZoneWeather(

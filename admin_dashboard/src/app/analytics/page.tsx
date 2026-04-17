@@ -158,6 +158,12 @@ export default async function AnalyticsPage() {
                       <span className="font-medium text-slate-700">{zone.name}</span>
                       <span className="text-slate-500">{zone.total_claims} claims</span>
                     </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                      <span className="rounded bg-slate-100 px-2 py-0.5">Risk {((zone.current_risk ?? 0) * 100).toFixed(0)}%</span>
+                      <span className="rounded bg-slate-100 px-2 py-0.5 capitalize">{zone.risk_level ?? 'medium'}</span>
+                      {zone.event_window_seconds ? <span className="rounded bg-slate-100 px-2 py-0.5">{Math.round(zone.event_window_seconds / 60)}m window</span> : null}
+                      {zone.risk_scope ? <span className="rounded bg-slate-100 px-2 py-0.5">{zone.risk_scope.replace('_', ' ')}</span> : null}
+                    </div>
                     <div className="mt-1 h-2 w-full rounded-full bg-slate-100">
                       <div
                         className="h-2 rounded-full bg-orange-500"

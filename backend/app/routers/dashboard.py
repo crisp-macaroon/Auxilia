@@ -19,6 +19,7 @@ from app.models.schemas import (
     ZoneHeatPoint,
 )
 from app.agents.trigger_agent import trigger_agent, ZONE_CONFIG
+from app.agents.risk_agent import risk_agent
 from app.core.security import require_admin
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"], dependencies=[Depends(require_admin)])
@@ -155,6 +156,8 @@ async def get_zone_statistics(
     zones_data = []
     
     for zone_id, zone_config in ZONE_CONFIG.items():
+        assessment = await risk_agent.assess_zone_risk(zone_id)
+
         # Get policy count
         policies = await db.execute(
             select(func.count(Policy.id)).where(
@@ -184,7 +187,11 @@ async def get_zone_statistics(
             "active_policies": policies.scalar() or 0,
             "total_claims": claim_row[0] or 0 if claim_row else 0,
             "total_payouts": round(claim_row[1] or 0, 2) if claim_row else 0,
-            "active_triggers": signal.get("active_count", 0) if signal else 0
+            "active_triggers": signal.get("active_count", 0) if signal else 0,
+            "current_risk": assessment.get("combined_risk", 0.0),
+            "risk_level": assessment.get("risk_level", "medium"),
+            "risk_scope": assessment.get("scope", "zone_event"),
+            "event_window_seconds": assessment.get("event_window_seconds"),
         })
     
     return {"zones": zones_data}

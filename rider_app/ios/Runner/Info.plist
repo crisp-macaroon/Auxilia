@@ -26,6 +26,14 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Auxilia uses your location to validate delivery coverage and risk in real time.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Auxilia tracks location in the background to keep protection and delivery history updated.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

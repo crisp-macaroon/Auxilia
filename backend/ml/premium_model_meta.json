@@ -1,8 +1,8 @@
 {
   "model_name": "premium-random-forest",
   "version": "premium-rf-v1",
-  "trained_at": "2026-04-15T17:38:15.223067",
-  "train_rows": 18000,
+  "trained_at": "2026-04-16T16:44:13.215530",
+  "train_rows": 15000,
   "feature_names": [
     "zone_hash",
     "zone_factor",

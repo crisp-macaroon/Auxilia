@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Search, Filter, Download, CloudRain, Car, TrendingUp, AlertTriangle, Eye, CheckCircle, XCircle, Clock } from 'lucide-react';
-import { approveClaim, getClaims, getClaimStats, rejectClaim, type ClaimListItem, type ClaimStatsResponse } from '@/lib/api';
+import { approveClaim, getClaimDetails, getClaims, getClaimStats, rejectClaim, type ClaimDetailsResponse, type ClaimListItem, type ClaimStatsResponse } from '@/lib/api';
 import { cn, formatCurrency, formatDateTime, getStatusBadgeClass } from '@/lib/utils';
 
 const iconMap = { rain: CloudRain, traffic: Car, surge: TrendingUp, road_disruption: AlertTriangle };
@@ -15,6 +15,8 @@ export default function ClaimsPage() {
   const [stats, setStats] = useState<ClaimStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
+  const [selectedClaimDetails, setSelectedClaimDetails] = useState<ClaimDetailsResponse | null>(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -29,6 +31,28 @@ export default function ClaimsPage() {
     }
     void load();
   }, []);
+
+  useEffect(() => {
+    if (!selectedClaimId) {
+      setSelectedClaimDetails(null);
+      return;
+    }
+
+    let active = true;
+    setDetailsLoading(true);
+
+    void getClaimDetails(selectedClaimId)
+      .then((details) => {
+        if (active) setSelectedClaimDetails(details);
+      })
+      .finally(() => {
+        if (active) setDetailsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [selectedClaimId]);
 
   const filteredClaims = useMemo(() => {
     return claims.filter((claim) => {
@@ -147,17 +171,31 @@ export default function ClaimsPage() {
             <h3 className="text-lg font-semibold text-slate-900">Claim Details</h3>
             {(() => {
               const claim = claims.find((c) => c.id === selectedClaimId);
+              if (detailsLoading) return <p className="mt-3 text-sm text-slate-500">Loading claim details...</p>;
               if (!claim) return <p className="mt-3 text-sm text-slate-500">Claim not found.</p>;
+
+              const payoutDecision = selectedClaimDetails?.payout_decision;
+              const earningContext = selectedClaimDetails?.earning_context;
+              const rider = selectedClaimDetails?.rider;
+              const zone = selectedClaimDetails?.zone;
+
               return (
                 <div className="mt-4 space-y-2 text-sm text-slate-700">
                   <p><span className="font-medium text-slate-900">Claim ID:</span> {claim.id}</p>
                   <p><span className="font-medium text-slate-900">Policy ID:</span> {claim.policy_id}</p>
                   <p><span className="font-medium text-slate-900">Rider ID:</span> {claim.rider_id}</p>
+                  <p><span className="font-medium text-slate-900">Zone:</span> {zone?.name ?? 'Unknown'}{zone?.city ? `, ${zone.city}` : ''}</p>
                   <p><span className="font-medium text-slate-900">Trigger:</span> {claim.trigger_type}</p>
                   <p><span className="font-medium text-slate-900">Amount:</span> {formatCurrency(claim.amount)}</p>
                   <p><span className="font-medium text-slate-900">Fraud score:</span> {(claim.fraud_score * 100).toFixed(0)}%</p>
                   <p><span className="font-medium text-slate-900">Status:</span> {claim.status}</p>
                   <p><span className="font-medium text-slate-900">Created:</span> {formatDateTime(claim.created_at)}</p>
+                  {rider ? <p><span className="font-medium text-slate-900">Rider earning model:</span> {rider.earning_model?.replace('_', ' ')}</p> : null}
+                  {payoutDecision ? <p><span className="font-medium text-slate-900">Payout exposure multiplier:</span> {payoutDecision.earning_exposure_multiplier.toFixed(2)}x</p> : null}
+                  {earningContext ? <p><span className="font-medium text-slate-900">Zone earning index:</span> {earningContext.zone_earning_index.toFixed(2)}x</p> : null}
+                  {earningContext ? <p><span className="font-medium text-slate-900">Rider earning factor:</span> {earningContext.rider_earning_factor.toFixed(2)}x</p> : null}
+                  {rider?.avg_hourly_income ? <p><span className="font-medium text-slate-900">Avg hourly income:</span> {formatCurrency(rider.avg_hourly_income)}</p> : null}
+                  {rider?.avg_order_value ? <p><span className="font-medium text-slate-900">Avg order value:</span> {formatCurrency(rider.avg_order_value)}</p> : null}
                 </div>
               );
             })()}

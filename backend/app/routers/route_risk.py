@@ -1,14 +1,16 @@
 import asyncio
 import math
+from datetime import datetime
 from typing import Iterable
 
 from fastapi import APIRouter
 
-from app.models.schemas import LocationHistoryCreate, RouteRiskRequest, RouteRiskResponse
+from app.models.schemas import LocationHistoryCreate, PersonaType, RouteRiskRequest, RouteRiskResponse
 from app.services.location_service import location_service
 from app.services.news_service import news_service
 from app.services.traffic_service import traffic_service
 from app.services.weather_service import weather_service
+from app.services.ml_service import risk_ml_service
 
 router = APIRouter(prefix="/riders", tags=["Route Analysis"])
 
@@ -225,13 +227,32 @@ async def assess_route_risk(
     route_traffic_risk = max(avg_traffic_risk, delay_ratio)
     closure_risk_boost = min(0.2, road_closure_count * 0.05)
 
-    overall_risk = min(
-        1.0,
-        (route_traffic_risk * 0.42)
-        + (avg_weather_risk * 0.28)
-        + (incident_risk * 0.25)
-        + closure_risk_boost,
-    )
+    risk_model_version = "fallback-v1"
+    try:
+        ml_overall_risk = risk_ml_service.predict_risk_score(
+            zone_id=f"route:{city.lower()}",
+            zone_base_risk=min(1.0, max(0.0, route_traffic_risk * 0.55 + avg_weather_risk * 0.45)),
+            weather_risk=avg_weather_risk,
+            traffic_risk=route_traffic_risk,
+            incident_risk=min(1.0, incident_risk + closure_risk_boost),
+            historical_risk=0.2,
+            persona=PersonaType.FOOD_DELIVERY,
+            age_band="26-35",
+            vehicle_type="scooter",
+            shift_type="mixed",
+            tenure_months=18,
+            month=datetime.utcnow().month,
+        )
+        overall_risk = min(1.0, max(0.0, ml_overall_risk))
+        risk_model_version = risk_ml_service.model_version
+    except Exception:
+        overall_risk = min(
+            1.0,
+            (route_traffic_risk * 0.42)
+            + (avg_weather_risk * 0.28)
+            + (incident_risk * 0.25)
+            + closure_risk_boost,
+        )
 
     risk_factors: list[str] = []
     if route_traffic_risk >= 0.55:
@@ -254,6 +275,7 @@ async def assess_route_risk(
         overall_risk_score=round(overall_risk, 3),
         risk_factors=risk_factors,
         epicenter_multiplier=round(epicenter_multiplier, 2),
+        risk_model_version=risk_model_version,
     )
 
 

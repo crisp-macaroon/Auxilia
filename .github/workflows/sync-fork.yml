@@ -1,0 +1,27 @@
+name: Sync Fork
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to fork
+        env:
+          FORK_REPO: ${{ secrets.FORK_REPO }}
+          FORK_TOKEN: ${{ secrets.FORK_TOKEN }}
+        run: |
+          if [ -z "$FORK_REPO" ] || [ -z "$FORK_TOKEN" ]; then
+            echo "FORK_REPO or FORK_TOKEN is missing; skipping fork sync."
+            exit 0
+          fi
+          git remote add fork "https://x-access-token:${FORK_TOKEN}@github.com/${FORK_REPO}.git"
+          git push fork main

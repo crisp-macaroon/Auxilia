@@ -41,6 +41,8 @@ class PayoutAgent:
         trigger_value: float,
         threshold: float,
         coverage_amount: float,
+        zone_earning_index: float = 1.0,
+        rider_earning_profile: Optional[Dict[str, Any]] = None,
         fraud_score: float = 0.0,
         policy_valid: bool = True
     ) -> PayoutDecision:
@@ -67,13 +69,21 @@ class PayoutAgent:
                 trigger_verification=trigger_value >= threshold,
                 fraud_check_passed=fraud_score < 0.7,
                 policy_valid=policy_valid,
+                earning_exposure_multiplier=1.0,
+                zone_earning_index=round(float(zone_earning_index or 1.0), 3),
+                rider_earning_factor=1.0,
                 blockchain_tx_hash=None,
                 decided_at=now
             )
         
         # Step 2: Calculate payout amount
-        payout_amount, payout_percentage = self._calculate_payout(
-            trigger_type, trigger_value, threshold, coverage_amount
+        payout_amount, payout_percentage, earning_details = self._calculate_payout(
+            trigger_type,
+            trigger_value,
+            threshold,
+            coverage_amount,
+            zone_earning_index=zone_earning_index,
+            rider_earning_profile=rider_earning_profile,
         )
         
         # Step 3: Process payment and notification in parallel
@@ -102,10 +112,16 @@ class PayoutAgent:
             approved=True,
             payout_amount=round(payout_amount, 2),
             payout_percentage=round(payout_percentage, 2),
-            decision_reason=f"Trigger {trigger_type} verified: {trigger_value} >= {threshold}",
+            decision_reason=(
+                f"Trigger {trigger_type} verified: {trigger_value} >= {threshold}; "
+                f"income exposure adjusted for local earning conditions"
+            ),
             trigger_verification=True,
             fraud_check_passed=True,
             policy_valid=True,
+            earning_exposure_multiplier=earning_details["earning_exposure_multiplier"],
+            zone_earning_index=earning_details["zone_earning_index"],
+            rider_earning_factor=earning_details["rider_earning_factor"],
             blockchain_tx_hash=tx_hash,
             decided_at=now
         )
@@ -146,8 +162,10 @@ class PayoutAgent:
         trigger_type: str,
         trigger_value: float,
         threshold: float,
-        coverage_amount: float
-    ) -> tuple[float, float]:
+        coverage_amount: float,
+        zone_earning_index: float = 1.0,
+        rider_earning_profile: Optional[Dict[str, Any]] = None,
+    ) -> tuple[float, float, Dict[str, float]]:
         """
         Calculate payout amount based on trigger severity.
         Uses graduated payout based on how much trigger exceeds threshold.
@@ -177,10 +195,64 @@ class PayoutAgent:
         multiplier = trigger_multipliers.get(trigger_type, 1.0)
         payout_percentage *= multiplier
         payout_percentage = min(100.0, payout_percentage)  # Cap at 100%
+
+        earning_details = self._calculate_earning_exposure_multiplier(
+            zone_earning_index=zone_earning_index,
+            rider_earning_profile=rider_earning_profile or {},
+        )
+        earning_exposure = earning_details["earning_exposure_multiplier"]
         
-        payout_amount = coverage_amount * (payout_percentage / 100.0)
+        payout_amount = coverage_amount * (payout_percentage / 100.0) * earning_exposure
+        payout_amount = min(coverage_amount, payout_amount)
         
-        return payout_amount, payout_percentage
+        return payout_amount, payout_percentage, earning_details
+
+    def _calculate_earning_exposure_multiplier(
+        self,
+        zone_earning_index: float,
+        rider_earning_profile: Dict[str, Any],
+    ) -> Dict[str, float]:
+        """
+        Adjust payout for regional and rider-specific earning context.
+        The same hazard should not imply the same income loss everywhere.
+        """
+        regional = max(0.8, min(1.4, float(zone_earning_index or 1.0)))
+
+        earning_model = str(rider_earning_profile.get("earning_model") or "per_delivery").lower()
+        avg_order_value = float(rider_earning_profile.get("avg_order_value") or 120.0)
+        avg_hourly_income = float(rider_earning_profile.get("avg_hourly_income") or 180.0)
+        avg_daily_orders = float(rider_earning_profile.get("avg_daily_orders") or 12.0)
+        avg_km_rate = float(rider_earning_profile.get("avg_km_rate") or 18.0)
+
+        delivery_component = avg_order_value / 120.0
+        hourly_component = avg_hourly_income / 180.0
+        volume_component = avg_daily_orders / 12.0
+        distance_component = avg_km_rate / 18.0
+
+        if earning_model == "per_km":
+            rider_specific = (distance_component * 0.65) + (hourly_component * 0.35)
+        elif earning_model == "hourly":
+            rider_specific = (hourly_component * 0.8) + (volume_component * 0.2)
+        else:
+            rider_specific = (delivery_component * 0.55) + (hourly_component * 0.25) + (volume_component * 0.2)
+
+        rider_specific = max(0.8, min(1.5, rider_specific))
+        exposure = round(max(0.8, min(1.5, (regional * 0.6) + (rider_specific * 0.4))), 3)
+        return {
+            "earning_exposure_multiplier": exposure,
+            "zone_earning_index": round(regional, 3),
+            "rider_earning_factor": round(rider_specific, 3),
+        }
+
+    def get_earning_exposure_details(
+        self,
+        zone_earning_index: float,
+        rider_earning_profile: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, float]:
+        return self._calculate_earning_exposure_multiplier(
+            zone_earning_index=zone_earning_index,
+            rider_earning_profile=rider_earning_profile or {},
+        )
     
     async def _process_upi_payment(
         self,
@@ -322,14 +394,21 @@ class PayoutAgent:
         trigger_type: str,
         trigger_value: float,
         threshold: float,
-        coverage_amount: float
+        coverage_amount: float,
+        zone_earning_index: float = 1.0,
+        rider_earning_profile: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Estimate payout without processing.
         Used for preview/calculation.
         """
-        payout_amount, payout_percentage = self._calculate_payout(
-            trigger_type, trigger_value, threshold, coverage_amount
+        payout_amount, payout_percentage, earning_details = self._calculate_payout(
+            trigger_type,
+            trigger_value,
+            threshold,
+            coverage_amount,
+            zone_earning_index=zone_earning_index,
+            rider_earning_profile=rider_earning_profile,
         )
         
         return {
@@ -339,6 +418,9 @@ class PayoutAgent:
             "coverage_amount": coverage_amount,
             "estimated_payout": round(payout_amount, 2),
             "payout_percentage": round(payout_percentage, 2),
+            "earning_exposure_multiplier": earning_details["earning_exposure_multiplier"],
+            "zone_earning_index": earning_details["zone_earning_index"],
+            "rider_earning_factor": earning_details["rider_earning_factor"],
             "calculation_method": "graduated",
             "estimated_at": datetime.utcnow().isoformat()
         }

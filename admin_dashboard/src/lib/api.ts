@@ -88,6 +88,10 @@ export type ZoneStatsResponse = {
     total_claims: number;
     total_payouts: number;
     active_triggers: number;
+    current_risk?: number;
+    risk_level?: 'low' | 'medium' | 'high' | 'very_high';
+    risk_scope?: string;
+    event_window_seconds?: number;
   }>;
 };
 
@@ -128,6 +132,11 @@ export type RiderListItem = {
   email?: string | null;
   persona: 'qcommerce' | 'food_delivery';
   zone_id: string;
+  earning_model?: 'per_delivery' | 'per_km' | 'hourly';
+  avg_order_value?: number;
+  avg_hourly_income?: number;
+  avg_daily_orders?: number;
+  avg_km_rate?: number;
   latitude?: number | null;
   longitude?: number | null;
   risk_score: number;
@@ -176,7 +185,34 @@ export type ZoneListItem = {
   radius_km: number;
   risk_level: string;
   base_premium_factor: number;
+  earning_index: number;
   is_active: boolean;
+};
+
+export type ClaimDetailsResponse = {
+  claim: ClaimListItem;
+  policy: PolicyListItem | null;
+  rider: RiderListItem | null;
+  zone: ZoneListItem | null;
+  fraud_assessment?: {
+    fraud_score: number;
+    risk_flags: string[];
+    verification_status: string;
+  } | null;
+  payout_decision?: {
+    approved: boolean;
+    payout_amount: number;
+    payout_percentage: number;
+    decision_reason: string;
+    earning_exposure_multiplier: number;
+    zone_earning_index: number;
+    rider_earning_factor: number;
+  } | null;
+  earning_context?: {
+    earning_exposure_multiplier: number;
+    zone_earning_index: number;
+    rider_earning_factor: number;
+  } | null;
 };
 
 export type RiderPoliciesResponse = {
@@ -312,6 +348,10 @@ export async function getClaims(params?: { status?: string; triggerType?: string
 
 export async function getClaimStats() {
   return apiFetch<ClaimStatsResponse>('/claims/stats/overview');
+}
+
+export async function getClaimDetails(claimId: string) {
+  return apiFetch<ClaimDetailsResponse>(`/claims/${claimId}/details`);
 }
 
 export async function approveClaim(claimId: string) {

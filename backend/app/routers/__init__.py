@@ -11,6 +11,7 @@ from app.routers.dashboard import router as dashboard_router
 from app.routers.weather import router as weather_router
 from app.routers.payments import router as payments_router
 from app.routers.auth import router as auth_router
+from app.routers.ml_ops import router as ml_ops_router
 
 __all__ = [
     "riders_router",
@@ -22,4 +23,5 @@ __all__ = [
     "weather_router",
     "payments_router",
     "auth_router",
+    "ml_ops_router",
 ]

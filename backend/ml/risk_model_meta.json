@@ -1,8 +1,8 @@
 {
   "model_name": "risk-gradient-boosting",
   "version": "risk-gbm-v1",
-  "trained_at": "2026-04-15T17:38:11.971852",
-  "train_rows": 15000,
+  "trained_at": "2026-04-16T17:11:55.752004",
+  "train_rows": 12000,
   "feature_names": [
     "zone_hash",
     "zone_base_risk",

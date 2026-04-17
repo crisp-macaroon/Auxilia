@@ -9,6 +9,7 @@ class Rider {
   final double? latitude;
   final double? longitude;
   final double riskScore;
+  final int loyaltyPoints;
   final String status;
   final DateTime createdAt;
 
@@ -22,6 +23,7 @@ class Rider {
     this.latitude,
     this.longitude,
     required this.riskScore,
+    required this.loyaltyPoints,
     required this.status,
     required this.createdAt,
   });
@@ -37,6 +39,7 @@ class Rider {
       latitude: json['latitude']?.toDouble(),
       longitude: json['longitude']?.toDouble(),
       riskScore: (json['risk_score'] ?? 0.5).toDouble(),
+      loyaltyPoints: (json['loyalty_points'] ?? 0) as int,
       status: json['status'] ?? 'active',
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
@@ -335,6 +338,106 @@ class TriggerStatusModel {
   }
 
   String get statusLabel => isActive ? 'TRIGGERED' : 'OK';
+}
+
+class DeliveryHistoryItem {
+  final String id;
+  final String riderId;
+  final String? orderId;
+  final String assignedZoneId;
+  final String? assignedZoneName;
+  final double deliveryLatitude;
+  final double deliveryLongitude;
+  final bool isDeliveryInCoverageZone;
+  final String eligibilityReason;
+  final double computedRiskScore;
+  final double weatherRisk;
+  final double trafficRisk;
+  final double incidentRisk;
+  final DateTime? assessedAt;
+  final DateTime createdAt;
+
+  DeliveryHistoryItem({
+    required this.id,
+    required this.riderId,
+    this.orderId,
+    required this.assignedZoneId,
+    this.assignedZoneName,
+    required this.deliveryLatitude,
+    required this.deliveryLongitude,
+    required this.isDeliveryInCoverageZone,
+    required this.eligibilityReason,
+    required this.computedRiskScore,
+    required this.weatherRisk,
+    required this.trafficRisk,
+    required this.incidentRisk,
+    this.assessedAt,
+    required this.createdAt,
+  });
+
+  factory DeliveryHistoryItem.fromJson(Map<String, dynamic> json) {
+    return DeliveryHistoryItem(
+      id: json['id'] ?? '',
+      riderId: json['rider_id'] ?? '',
+      orderId: json['order_id'],
+      assignedZoneId: json['assigned_zone_id'] ?? '',
+      assignedZoneName: json['assigned_zone_name'],
+      deliveryLatitude: (json['delivery_latitude'] ?? 0).toDouble(),
+      deliveryLongitude: (json['delivery_longitude'] ?? 0).toDouble(),
+      isDeliveryInCoverageZone: json['is_delivery_in_coverage_zone'] ?? false,
+      eligibilityReason: json['eligibility_reason'] ?? '',
+      computedRiskScore: (json['computed_risk_score'] ?? 0).toDouble(),
+      weatherRisk: (json['weather_risk'] ?? 0).toDouble(),
+      trafficRisk: (json['traffic_risk'] ?? 0).toDouble(),
+      incidentRisk: (json['incident_risk'] ?? 0).toDouble(),
+      assessedAt: json['assessed_at'] != null
+          ? DateTime.parse(json['assessed_at'])
+          : null,
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
+          : DateTime.now(),
+    );
+  }
+}
+
+class PublicPayoutLogEntry {
+  final String claimId;
+  final String rider;
+  final String triggerType;
+  final double triggerValue;
+  final double threshold;
+  final double payoutAmount;
+  final String? zone;
+  final String? txHash;
+  final DateTime processedAt;
+
+  PublicPayoutLogEntry({
+    required this.claimId,
+    required this.rider,
+    required this.triggerType,
+    required this.triggerValue,
+    required this.threshold,
+    required this.payoutAmount,
+    this.zone,
+    this.txHash,
+    required this.processedAt,
+  });
+
+  factory PublicPayoutLogEntry.fromJson(Map<String, dynamic> json) {
+    return PublicPayoutLogEntry(
+      claimId: json['claim_id'] ?? '',
+      rider: json['rider'] ?? 'Rider',
+      triggerType: json['trigger_type'] ?? 'unknown',
+      triggerValue: (json['trigger_value'] ?? 0).toDouble(),
+      threshold: (json['threshold'] ?? 0).toDouble(),
+      payoutAmount: (json['payout_amount'] ?? 0).toDouble(),
+      zone: json['zone'],
+      txHash: json['tx_hash'],
+      processedAt: json['processed_at'] != null
+          ? DateTime.parse(json['processed_at'])
+          : DateTime.now(),
+    );
+  }
 }
 
 /// Weather data model

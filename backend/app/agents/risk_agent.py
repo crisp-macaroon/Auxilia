@@ -5,7 +5,7 @@ Uses real ML models + live data for premium calculation
 import asyncio
 import logging
 from datetime import datetime
-from typing import Dict, Optional, List, Tuple
+from typing import Any, Dict, Optional, List, Tuple
 
 from app.core.config import settings
 from app.services.weather_service import weather_service
@@ -109,6 +109,74 @@ class RiskAgent:
     
     def __init__(self):
         self._risk_cache: Dict[str, RiskAssessment] = {}
+        self._zone_event_cache: Dict[str, Dict[str, Any]] = {}
+
+    def _event_bucket_seconds(self) -> int:
+        return max(60, int(settings.TRIGGER_POLL_INTERVAL or 300))
+
+    def _event_bucket_key(self, zone_id: str, now: datetime) -> str:
+        bucket_seconds = self._event_bucket_seconds()
+        bucket_id = int(now.timestamp()) // bucket_seconds
+        return f"{zone_id}:{bucket_id}"
+
+    def _resolve_zone_anchor(
+        self,
+        zone_id: str,
+        lat: Optional[float] = None,
+        lon: Optional[float] = None,
+    ) -> tuple[float, float, dict[str, Any]]:
+        from app.agents.trigger_agent import ZONE_CONFIG
+
+        zone = ZONE_CONFIG.get(zone_id, {})
+        anchor_lat = float(zone.get("lat", lat or 0.0))
+        anchor_lon = float(zone.get("lon", lon or 0.0))
+        return anchor_lat, anchor_lon, zone
+
+    async def _get_zone_event_snapshot(
+        self,
+        zone_id: str,
+        lat: Optional[float] = None,
+        lon: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """
+        Treat live disruptions as short-lived zone events rather than per-rider events.
+        Riders in the same zone and time window inherit this snapshot, then get
+        smaller rider-specific adjustments on top.
+        """
+        now = datetime.utcnow()
+        cache_key = self._event_bucket_key(zone_id, now)
+        cached = self._zone_event_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        anchor_lat, anchor_lon, zone = self._resolve_zone_anchor(zone_id, lat, lon)
+        weather_risk_raw, traffic_risk_raw, incident_risk_raw = await asyncio.gather(
+            self._get_weather_risk(anchor_lat, anchor_lon),
+            self._get_traffic_risk(anchor_lat, anchor_lon),
+            self._get_incident_risk(zone_id),
+        )
+
+        bucket_seconds = self._event_bucket_seconds()
+        snapshot = {
+            "zone_id": zone_id,
+            "zone_name": zone.get("name", "Unknown"),
+            "anchor_lat": round(anchor_lat, 6),
+            "anchor_lon": round(anchor_lon, 6),
+            "weather_risk": float(weather_risk_raw),
+            "traffic_risk": float(traffic_risk_raw),
+            "incident_risk": float(incident_risk_raw),
+            "event_window_seconds": bucket_seconds,
+            "scope": "zone_event",
+            "assessed_at": now,
+        }
+        current_bucket_suffix = cache_key.split(":")[-1]
+        self._zone_event_cache = {
+            key: value
+            for key, value in self._zone_event_cache.items()
+            if key.split(":")[-1] == current_bucket_suffix
+        }
+        self._zone_event_cache[cache_key] = snapshot
+        return snapshot
 
     @staticmethod
     def _fallback_ml_risk(
@@ -153,18 +221,10 @@ class RiskAgent:
         # Get base zone risk
         base_risk = ZONE_BASE_RISK.get(zone_id, 0.5)
         
-        async def _zero() -> float:
-            return 0.0
-
-        # Get real-time risk factors in parallel
-        weather_risk_raw, traffic_risk_raw, incident_risk_raw = await asyncio.gather(
-            self._get_weather_risk(lat, lon) if lat and lon else _zero(),
-            self._get_traffic_risk(lat, lon) if lat and lon else _zero(),
-            self._get_incident_risk(zone_id),
-        )
-        weather_risk = float(weather_risk_raw)
-        traffic_risk = float(traffic_risk_raw)
-        incident_risk = float(incident_risk_raw)
+        zone_event = await self._get_zone_event_snapshot(zone_id=zone_id, lat=lat, lon=lon)
+        weather_risk = float(zone_event["weather_risk"])
+        traffic_risk = float(zone_event["traffic_risk"])
+        incident_risk = float(zone_event["incident_risk"])
         
         # Calculate historical risk from claims
         historical_risk = self._calculate_historical_risk(claim_history or [])
@@ -208,16 +268,21 @@ class RiskAgent:
                 demographic_risk,
             )
 
-        # Keep a lightweight calibration against seasonal + persona prior
-        persona_factor = PERSONA_RISK_FACTOR.get(persona, 1.0)
-        seasonal_factor = MONTHLY_RISK_FACTOR.get(month, 1.0)
-        prior_adjustment = min(1.15, max(0.88, (persona_factor * seasonal_factor) ** 0.20))
-        final_risk = max(0.0, min(1.0, ml_risk * prior_adjustment))
+        # Keep fallback calibration only when ML inference is unavailable.
+        if risk_model_version == "fallback-v1":
+            persona_factor = PERSONA_RISK_FACTOR.get(persona, 1.0)
+            seasonal_factor = MONTHLY_RISK_FACTOR.get(month, 1.0)
+            prior_adjustment = min(1.15, max(0.88, (persona_factor * seasonal_factor) ** 0.20))
+            final_risk = max(0.0, min(1.0, ml_risk * prior_adjustment))
+        else:
+            final_risk = max(0.0, min(1.0, ml_risk))
         
         # Generate risk factors and recommendations
         risk_factors = self._identify_risk_factors(
             base_risk, weather_risk, traffic_risk, incident_risk, historical_risk
         )
+        if max(weather_risk, traffic_risk, incident_risk) >= 0.35:
+            risk_factors.append("Inherited active zone disruption snapshot")
         if demographic_risk >= 0.55:
             risk_factors.append("Rider segment exposure is elevated")
         recommendations = self._generate_recommendations(risk_factors, final_risk)
@@ -281,10 +346,37 @@ class RiskAgent:
         )
 
         macro_risk = float(macro.get("score", 0.0))
-        delivery_weighted = min(
-            1.0,
-            base_assessment.final_risk_score * 0.8 + macro_risk * 0.2,
-        )
+        merged_incident_risk = min(1.0, max(base_assessment.incident_risk, macro_risk))
+
+        risk_model_version = base_assessment.ml_model_version or "fallback-v1"
+        try:
+            from app.services.ml_service import risk_ml_service
+
+            profile = rider_profile or {}
+            delivery_risk = risk_ml_service.predict_risk_score(
+                zone_id=zone_id,
+                zone_base_risk=base_assessment.base_risk_score,
+                weather_risk=base_assessment.weather_risk,
+                traffic_risk=base_assessment.traffic_risk,
+                incident_risk=merged_incident_risk,
+                historical_risk=base_assessment.historical_risk,
+                persona=persona,
+                age_band=profile.get("age_band"),
+                vehicle_type=profile.get("vehicle_type"),
+                shift_type=profile.get("shift_type"),
+                tenure_months=profile.get("tenure_months"),
+                month=datetime.utcnow().month,
+            )
+            risk_model_version = risk_ml_service.model_version
+        except Exception:
+            # Deterministic fallback only when model inference fails.
+            delivery_risk = min(
+                1.0,
+                max(
+                    0.01,
+                    base_assessment.final_risk_score * 0.8 + macro_risk * 0.2,
+                ),
+            )
 
         factors = list(base_assessment.risk_factors)
         if macro_risk >= 0.4:
@@ -302,10 +394,11 @@ class RiskAgent:
             base_risk_score=base_assessment.base_risk_score,
             weather_risk=base_assessment.weather_risk,
             traffic_risk=base_assessment.traffic_risk,
-            incident_risk=max(base_assessment.incident_risk, round(macro_risk, 3)),
+            incident_risk=round(merged_incident_risk, 3),
             demographic_risk=base_assessment.demographic_risk,
             historical_risk=base_assessment.historical_risk,
-            final_risk_score=round(delivery_weighted, 3),
+            final_risk_score=round(delivery_risk, 3),
+            ml_model_version=risk_model_version,
             risk_factors=factors,
             recommendations=recommendations,
             segment_summary=base_assessment.segment_summary,
@@ -362,20 +455,11 @@ class RiskAgent:
         """
         base_risk = ZONE_BASE_RISK.get(zone_id, 0.5)
         
-        # Get zone coordinates (would come from database in production)
-        from app.agents.trigger_agent import ZONE_CONFIG
-        zone = ZONE_CONFIG.get(zone_id, {})
-        lat = zone.get("lat", 0)
-        lon = zone.get("lon", 0)
-        
-        weather_risk_raw, traffic_risk_raw, incident_risk_raw = await asyncio.gather(
-            self._get_weather_risk(lat, lon),
-            self._get_traffic_risk(lat, lon),
-            self._get_incident_risk(zone_id),
-        )
-        weather_risk = float(weather_risk_raw)
-        traffic_risk = float(traffic_risk_raw)
-        incident_risk = float(incident_risk_raw)
+        _, _, zone = self._resolve_zone_anchor(zone_id)
+        zone_event = await self._get_zone_event_snapshot(zone_id=zone_id)
+        weather_risk = float(zone_event["weather_risk"])
+        traffic_risk = float(zone_event["traffic_risk"])
+        incident_risk = float(zone_event["incident_risk"])
         
         risk_model_version = "fallback-v1"
         try:
@@ -417,6 +501,8 @@ class RiskAgent:
             "risk_level": self._risk_to_level(combined_risk),
             "premium_multiplier": self.calculate_premium_multiplier(combined_risk),
             "risk_model_version": risk_model_version,
+            "scope": zone_event.get("scope", "zone_event"),
+            "event_window_seconds": zone_event.get("event_window_seconds", self._event_bucket_seconds()),
             "assessed_at": datetime.utcnow().isoformat()
         }
     

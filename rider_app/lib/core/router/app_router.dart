@@ -10,6 +10,7 @@ import '../../features/onboarding/presentation/screens/review_screen.dart';
 import '../../features/onboarding/presentation/screens/success_screen.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
 import '../../features/home/presentation/screens/dashboard_screen.dart';
+import '../../features/home/presentation/screens/delivery_history_screen.dart';
 import '../../features/claims/presentation/screens/claims_screen.dart';
 import '../../features/policy/presentation/screens/policy_screen.dart';
 import '../../features/profile/presentation/screens/profile_settings_screen.dart';
@@ -27,6 +28,7 @@ class AppRoutes {
   static const String review = '/onboarding/review';
   static const String success = '/onboarding/success';
   static const String home = '/home';
+  static const String deliveryHistory = '/delivery-history';
   static const String claims = '/claims';
   static const String policy = '/policy';
   static const String settings = '/settings';
@@ -42,6 +44,11 @@ final GoRouter appRouter = GoRouter(
       path: AppRoutes.splash,
       name: 'splash',
       builder: (context, state) => const SplashScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.deliveryHistory,
+      name: 'delivery-history',
+      builder: (context, state) => const DeliveryHistoryScreen(),
     ),
 
     // Onboarding Flow
