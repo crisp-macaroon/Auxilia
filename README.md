@@ -1,12 +1,10 @@
 # Auxilia
 
-Auxilia is an AI-powered parametric income-protection platform for gig workers.
+Auxilia is income protection for gig workers — the ones doing Q-commerce and food delivery, who lose shift earnings when disruptions hit and currently have nowhere to turn.
 
-Gig workers lose earnings when disruptions hit, even when they are actively on shift. Auxilia addresses that gap with a weekly protection model designed for Q-commerce and food-delivery workflows.
+It has three parts: a rider mobile app, an admin ops dashboard, and a FastAPI backend that monitors live disruption signals (rain, traffic, road incidents, demand drops) to handle pricing, claim validation, and payouts.
 
-The platform combines a rider mobile app, an admin operations dashboard, and a FastAPI backend that monitors live disruption signals (rain, traffic, road incidents, and low-demand surge windows) to support risk-aware pricing, claim validation, and fast payout decisions.
-
-In short: riders buy weekly coverage, triggers are monitored continuously, claims are validated through fraud checks, and eligible payouts are processed through a simulated instant-settlement flow.
+Riders buy weekly coverage. The backend watches triggers continuously. Claims go through fraud checks. Eligible payouts go out through a simulated instant-settlement flow. That's the whole loop.
 
 Repository components:
 - [backend](backend/) (FastAPI): auth, policies, claims, fraud checks, payouts, trigger monitoring
@@ -17,33 +15,32 @@ Live links:
 - Web dashboard: [https://auxilia.sabarixr.me](https://auxilia.sabarixr.me)
 - Backend API: [https://auxila-api.sabarixr.me](https://auxila-api.sabarixr.me)
 
-## Core Scope
+## Scope
 
-Auxilia covers **loss of income** from operational disruptions (rain, traffic, road incidents, low-demand surge windows). It is not a health/life/vehicle damage insurance product.
+Loss of income from operational disruptions. Not health, life, or vehicle damage.
 
-## Key Features
+## How it works
 
-- **Rider experience**: structured onboarding, weekly policy purchase and renewal, policy health visibility, and claim submission with transparent status progression.
-- **Insurer operations**: centralized rider/policy/claim control, flagged-claim review workflows, and operational analytics for coverage and payouts.
-- **Risk and pricing intelligence**: ML-backed risk scoring and premium computation using live disruption signals plus rider and zone context.
-- **Fraud and payout automation**: delivery-specific validation checks (location, trigger evidence, duplicate/frequency patterns, behavior) followed by an instant payout simulation path for eligible claims.
+- Riders onboard, pick a weekly policy, and submit claims through the app with a visible status trail at each step. On the insurer side, admins get rider/policy/claim management, a flagged-claim review queue, and analytics covering coverage and payouts.
+
+- Pricing runs on ML-backed risk scoring that pulls in live disruption signals, rider history, and zone context. Claims go through four checks — location validity, trigger evidence, duplicate/frequency patterns, behavioral signals — before a payout decision gets made.
 
 Detailed feature mapping is available in [docs/FEATURES.md](docs/FEATURES.md).
 
 ## What Makes It Different
 
-- **Zone-first protection logic**: Auxilia evaluates risk and claim eligibility at the delivery-zone level, not with a one-size-fits-all city average. This makes policy decisions more realistic for dense urban operations where two nearby areas can have very different disruption profiles.
-- **Built for short delivery windows**: pricing and claim logic are tuned for high-pressure 10-20 minute delivery cycles, where even short disruptions can erase a worker's expected shift earnings.
-- **Multi-trigger parametric model**: the platform is not rain-only. It combines rainfall intensity, traffic congestion, road disruption signals, and low-demand surge drops to represent real working conditions.
-- **Fast, explainable claim path**: each claim moves through transparent checks (location validity, trigger evidence, duplicate/frequency, behavior), then into payout simulation for eligible cases.
-- **Worker + insurer aligned metrics**: worker-facing coverage outcomes (earnings protected, active weekly coverage) are paired with insurer-facing controls (loss ratio, fraud posture, next-week likely claim forecasts).
+- Most parametric products price on city-wide averages. Auxilia works at the delivery-zone level. Two zones a kilometer apart in a dense city can have very different disruption profiles, and averaging them together produces bad decisions for everyone.
 
+- It's also not rain-only, which most weather protection products are. Auxilia combines rainfall, traffic congestion, road incidents, and demand-surge drops — a closer approximation of what actually disrupts a delivery shift.
+
+- The claim flow shows its work. Each check is named and visible to the worker. They can see where their claim is and why it's there. That part matters more than it sounds.
 ## Reviewer Snapshot
 
-- **What this project demonstrates**: end-to-end parametric coverage lifecycle from policy purchase to claim validation to payout.
-- **Who it is for**: delivery workers operating in disruption-heavy urban zones.
-- **What is production-ready in this repo**: live dashboard + API deployment, trigger monitoring, seeded demo data, and reproducible local setup.
-- **Where to validate quickly**: [docs/SETUP.md](docs/SETUP.md) for run steps and demo credentials, then [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for system and user flow.
+- This repo covers the full parametric lifecycle: purchase, monitoring, validation, payout. It's built for delivery workers in disruption-heavy urban areas.
+
+- What's working right now: live dashboard, live API, trigger monitoring, seeded demo data, reproducible local setup.
+
+- Start at docs/SETUP.md for run steps and credentials. Then docs/ARCHITECTURE.md for how it all connects.
 
 ## Navigate This Repo
 
@@ -84,12 +81,12 @@ flutter run
 
 Start here: [docs/README.md](docs/README.md)
 
-- Features: [docs/FEATURES.md](docs/FEATURES.md) - complete capability breakdown across rider app, admin dashboard, and backend.
-- Architecture and flow diagrams: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - high-level system map plus product usage flow.
-- Setup and demo credentials: [docs/SETUP.md](docs/SETUP.md) - local run commands and seeded login details.
-- Environment variables (`.env.sample`): [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) - practical variable reference and defaults.
-- API route map: [docs/API.md](docs/API.md) - route groups and important endpoints.
-- Deployment notes: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) - GHCR, VM runtime, Nginx, and TLS setup.
+- Features: [docs/FEATURES.md](docs/FEATURES.md) - full capability breakdown.
+- Architecture and flow diagrams: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - system map and usage flow.
+- Setup and demo credentials: [docs/SETUP.md](docs/SETUP.md) - local run + demo credentials.
+- Environment variables (`.env.sample`): [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) - .env variable reference.
+- API route map: [docs/API.md](docs/API.md) - route groups and endpoints.
+- Deployment notes: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) - GGHCR, VM, Nginx, TLS.
 
 ## Visuals
 
@@ -97,7 +94,7 @@ Architecture and product flow Mermaid diagrams are already included in [docs/ARC
 
 ## API Docs
 
-When backend is running locally:
+When running locally:
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
 - Health: `http://localhost:8000/health`
