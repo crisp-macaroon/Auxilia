@@ -160,6 +160,7 @@ class Policy {
   });
 
   factory Policy.fromJson(Map<String, dynamic> json) {
+    final rawStatus = (json['status'] ?? 'active').toString();
     return Policy(
       id: json['id'] ?? '',
       riderId: json['rider_id'] ?? '',
@@ -173,7 +174,7 @@ class Policy {
       endDate: json['end_date'] != null
           ? DateTime.parse(json['end_date'])
           : DateTime.now().add(const Duration(days: 7)),
-      status: json['status'] ?? 'active',
+      status: rawStatus.toLowerCase(),
       txHash: json['tx_hash'],
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
@@ -187,7 +188,8 @@ class Policy {
     return diff > 0 ? diff : 0;
   }
 
-  bool get isActive => status == 'active' && endDate.isAfter(DateTime.now());
+  bool get isActive =>
+      status.toLowerCase() == 'active' && endDate.isAfter(DateTime.now());
 }
 
 /// Claim model

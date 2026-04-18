@@ -1,25 +1,36 @@
 'use client';
 
 import { Bell, Search, ChevronDown } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { getLiveTriggers, getPricingAlerts, getRecentClaims } from '@/lib/api';
+
+type NotificationItem = {
+  id: string;
+  message: string;
+  time: string;
+  type: 'trigger' | 'claim' | 'pricing';
+};
+
+type TriggerNotification = Awaited<ReturnType<typeof getLiveTriggers>>['triggers'][number];
+type ClaimNotification = Awaited<ReturnType<typeof getRecentClaims>>['claims'][number];
+type PricingNotification = Awaited<ReturnType<typeof getPricingAlerts>>['alerts'][number];
 
 
 export function Header() {
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState<{id: string, message: string, time: string, type: string}[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [currentDateLabel, setCurrentDateLabel] = useState('');
-
-  useEffect(() => {
-    setCurrentDateLabel(
+  const currentDateLabel = useMemo(
+    () =>
       new Date().toLocaleDateString('en-IN', {
         weekday: 'short',
         day: 'numeric',
         month: 'short',
-      })
-    );
+      }),
+    []
+  );
 
+  useEffect(() => {
     async function loadNotifications() {
       try {
         const [triggersRes, claimsRes, pricingRes] = await Promise.all([
@@ -28,9 +39,9 @@ export function Header() {
           getPricingAlerts(),
         ]);
 
-        const newNotifs: {id: string, message: string, time: string, type: string}[] = [];
+        const newNotifs: NotificationItem[] = [];
         
-        triggersRes.triggers.forEach((t: any, i: number) => {
+        triggersRes.triggers.forEach((t: TriggerNotification, i: number) => {
           newNotifs.push({
             id: `trigger-${i}`,
             message: `${t.trigger_type.toUpperCase()} alert in ${t.zone_name}`,
@@ -39,7 +50,7 @@ export function Header() {
           });
         });
 
-        claimsRes.claims.forEach((c: any, i: number) => {
+        claimsRes.claims.forEach((c: ClaimNotification, i: number) => {
           newNotifs.push({
             id: `claim-${i}`,
             message: `New claim (${c.trigger_type}) - ${c.status}`,
@@ -48,7 +59,7 @@ export function Header() {
           });
         });
 
-        pricingRes.alerts.forEach((alert: any, i: number) => {
+        pricingRes.alerts.forEach((alert: PricingNotification, i: number) => {
           const direction = alert.weekly_adjustment > 0 ? 'up' : 'down';
           newNotifs.push({
             id: `pricing-${i}`,

@@ -56,7 +56,7 @@ class PolicyScreen extends ConsumerWidget {
                     if (policy == null) {
                       final latestPolicy = latestPolicyAsync.valueOrNull;
                       final rider = riderAsync.valueOrNull;
-                      if (latestPolicy != null) {
+                      if (latestPolicy != null && latestPolicy.isActive) {
                         return _PolicyHero(policy: latestPolicy);
                       }
                       return _EmptyPolicyCard(
@@ -75,7 +75,9 @@ class PolicyScreen extends ConsumerWidget {
                 policyAsync.when(
                   data: (policy) {
                     final latestPolicy = latestPolicyAsync.valueOrNull;
-                    final effectivePolicy = policy ?? latestPolicy;
+                    final effectivePolicy =
+                        policy ??
+                        (latestPolicy?.isActive == true ? latestPolicy : null);
                     if (effectivePolicy == null) {
                       return _BuyPolicyAction(
                         rider: riderAsync.valueOrNull,
@@ -93,8 +95,12 @@ class PolicyScreen extends ConsumerWidget {
                 policyAsync
                     .when(
                       data: (policy) {
+                        final latestPolicy = latestPolicyAsync.valueOrNull;
                         final effectivePolicy =
-                            policy ?? latestPolicyAsync.valueOrNull;
+                            policy ??
+                            (latestPolicy?.isActive == true
+                                ? latestPolicy
+                                : null);
                         if (effectivePolicy == null) {
                           return const SizedBox.shrink();
                         }
