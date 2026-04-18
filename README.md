@@ -15,6 +15,11 @@ Live links:
 - Web dashboard: [https://auxilia.sabarixr.me](https://auxilia.sabarixr.me)
 - Backend API: [https://auxila-api.sabarixr.me](https://auxila-api.sabarixr.me)
 
+Project docs:
+- Presentation deck: [`docs/Auxilia.pptx`](docs/Auxilia.pptx)
+
+
+
 ## Scope
 
 Loss of income from operational disruptions. Not health, life, or vehicle damage.
