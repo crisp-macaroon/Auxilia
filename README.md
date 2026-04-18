@@ -7,18 +7,22 @@ It has three parts: a rider mobile app, an admin ops dashboard, and a FastAPI ba
 Riders buy weekly coverage. The backend watches triggers continuously. Claims go through fraud checks. Eligible payouts go out through a simulated instant-settlement flow. That's the whole loop.
 
 Repository components:
+
 - [backend](backend/) (FastAPI): auth, policies, claims, fraud checks, payouts, trigger monitoring
 - [admin_dashboard](admin_dashboard/) (Next.js): insurer/admin operations and analytics
 - [rider_app](rider_app/) (Flutter): rider onboarding, policy purchase, claims, live status
 
 Live links:
+
 - Web dashboard: [https://auxilia.sabarixr.me](https://auxilia.sabarixr.me)
 - Backend API: [https://auxila-api.sabarixr.me](https://auxila-api.sabarixr.me)
 
 Project docs:
-- Presentation deck: [`docs/Auxilia.pptx`](docs/Auxilia.pptx)
 
+- Presentation deck: [`docs/Auxilia.pptx`](docs/Auxilia-Pitch-Deck.pdf)
 
+Demo Video
+[`Watch Demo`](https://youtu.be/gFWxLQVpWzk?si=9IdxNgxZxjeYP8gw)
 
 ## Scope
 
@@ -39,6 +43,7 @@ Detailed feature mapping is available in [docs/FEATURES.md](docs/FEATURES.md).
 - It's also not rain-only, which most weather protection products are. Auxilia combines rainfall, traffic congestion, road incidents, and demand-surge drops — a closer approximation of what actually disrupts a delivery shift.
 
 - The claim flow shows its work. Each check is named and visible to the worker. They can see where their claim is and why it's there. That part matters more than it sounds.
+
 ## Reviewer Snapshot
 
 - This repo covers the full parametric lifecycle: purchase, monitoring, validation, payout. It's built for delivery workers in disruption-heavy urban areas.
@@ -55,6 +60,7 @@ Detailed feature mapping is available in [docs/FEATURES.md](docs/FEATURES.md).
 ## Demo Access
 
 For local or hosted demo walkthroughs, use:
+
 - Admin: `admin` / `auxilia123` (or values from `backend/.env`)
 - Rider: `+919876543200` / `rider123`
 
@@ -88,6 +94,7 @@ Start here: [docs/README.md](docs/README.md)
 
 - Features: [docs/FEATURES.md](docs/FEATURES.md) - full capability breakdown.
 - Architecture and flow diagrams: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - system map and usage flow.
+- AI and fraud core diagrams: [docs/ARCHITECTURE.md#ai-core-diagram](docs/ARCHITECTURE.md#ai-core-diagram), [docs/ARCHITECTURE.md#fraud-core-diagram](docs/ARCHITECTURE.md#fraud-core-diagram) - scoring and claim validation logic.
 - Setup and demo credentials: [docs/SETUP.md](docs/SETUP.md) - local run + demo credentials.
 - Environment variables (`.env.sample`): [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) - .env variable reference.
 - API route map: [docs/API.md](docs/API.md) - route groups and endpoints.
@@ -96,6 +103,7 @@ Start here: [docs/README.md](docs/README.md)
 ## API Docs
 
 When running locally:
+
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
 - Health: `http://localhost:8000/health`
