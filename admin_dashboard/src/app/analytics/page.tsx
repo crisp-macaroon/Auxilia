@@ -1,10 +1,10 @@
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
-import { getArchitecture, getClaimsChart, getDashboardStats, getPersonaBreakdown, getPredictiveClaims, getRevenueMetrics, getTriggerDistribution, getZoneHeatmap, getZoneStats } from '@/lib/api';
+import { getArchitecture, getClaimsChart, getDashboardStats, getPersonaBreakdown, getRevenueMetrics, getTriggerDistribution, getZoneHeatmap, getZoneStats } from '@/lib/api';
 import { ZoneHeatmap, ZoneMap } from '@/components/dashboard';
 
 export default async function AnalyticsPage() {
-  const [revenue, distribution, zones, stats, claimsChart, personas, heatmap, architecture, predictiveClaims] = await Promise.all([
+  const [revenue, distribution, zones, stats, claimsChart, personas, heatmap, architecture] = await Promise.all([
     getRevenueMetrics(),
     getTriggerDistribution(),
     getZoneStats(),
@@ -13,7 +13,6 @@ export default async function AnalyticsPage() {
     getPersonaBreakdown(),
     getZoneHeatmap(),
     getArchitecture(),
-    getPredictiveClaims(),
   ]);
 
   const monthlyData = claimsChart.data.map((item) => ({
@@ -38,7 +37,6 @@ export default async function AnalyticsPage() {
     { label: 'Loss Ratio', value: `${revenue.loss_ratio.toFixed(1)}%`, change: 'Live backend metric', trend: revenue.loss_ratio > 80 ? 'up' : 'down' },
     { label: 'Avg Claim', value: formatCurrency(revenue.average_claim), change: 'Approved payouts only', trend: 'neutral' },
     { label: 'Fraud Detection', value: `${(1 - stats.avg_risk_score).toFixed(2)}`, change: 'Portfolio confidence', trend: 'up' },
-    { label: 'Next Week Claims', value: `${predictiveClaims.total_next_week_likely_claims.toFixed(1)}`, change: 'Forecast from live signals', trend: 'neutral' },
   ];
 
   return (
@@ -62,31 +60,6 @@ export default async function AnalyticsPage() {
               </div>
             </div>
           ))}
-      </div>
-
-      <div className="rounded-2xl border border-slate-200 bg-white p-6">
-        <h3 className="text-lg font-semibold text-slate-900">Next Week Claim Forecast</h3>
-        <p className="text-sm text-slate-500">Predictive analytics for likely disruption claims by zone</p>
-
-        {predictiveClaims.predictions.length > 0 ? (
-          <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2">
-            {predictiveClaims.predictions.slice(0, 8).map((item) => (
-              <div key={item.zone_id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-slate-900">{item.zone_name}</p>
-                  <span className="text-xs font-medium text-slate-600">{item.city}</span>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-600">
-                  <span className="rounded bg-white px-2 py-0.5">Likely claims: {item.next_week_likely_claims.toFixed(1)}</span>
-                  <span className="rounded bg-white px-2 py-0.5">Trigger prob: {(item.likely_trigger_probability * 100).toFixed(0)}%</span>
-                  <span className="rounded bg-white px-2 py-0.5">Active policies: {item.active_policies}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">No predictive claim data available yet.</div>
-        )}
       </div>
 
       <ZoneHeatmap points={heatmap.points} />
