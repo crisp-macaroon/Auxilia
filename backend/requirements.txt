@@ -30,4 +30,4 @@ aiosqlite==0.19.0
 # Local development uses SQLite via aiosqlite.
 # PostgreSQL drivers are kept in requirements-postgres.txt because asyncpg
 # does not currently build on Python 3.14.
-firebase-admin==7.4.0
+firebase-admin
