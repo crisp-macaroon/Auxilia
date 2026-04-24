@@ -1,3 +1,6 @@
+import json
+
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 from typing import Optional, List
@@ -19,7 +22,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "your-super-secret-key-change-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    CORS_ORIGINS: List[str] = ["*"]
+    CORS_ORIGINS: str | List[str] = ["*"]
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str = "auxilia123"
     
@@ -77,6 +80,22 @@ class Settings(BaseSettings):
         self.CONGESTION_THRESHOLD = self.TRAFFIC_THRESHOLD_PERCENT
         self.SURGE_THRESHOLD = self.SURGE_THRESHOLD_MULTIPLIER
         self.INCIDENT_THRESHOLD = self.ROAD_DISRUPTION_THRESHOLD_COUNT
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value):
+        if isinstance(value, list):
+            return value
+        if isinstance(value, str):
+            cleaned = value.strip()
+            if not cleaned:
+                return ["*"]
+            if cleaned.startswith("["):
+                parsed = json.loads(cleaned)
+                if isinstance(parsed, list):
+                    return [str(item).strip() for item in parsed if str(item).strip()]
+            return [item.strip() for item in cleaned.split(",") if item.strip()]
+        return value
     
     class Config:
         env_file = ".env"

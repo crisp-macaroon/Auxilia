@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme/theme.dart';
 import 'core/router/app_router.dart';
+import 'core/services/fcm_service.dart';
+import 'core/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,6 +25,9 @@ void main() async {
       systemNavigationBarIconBrightness: Brightness.dark,
     ),
   );
+
+  await NotificationService().initialize();
+  await FcmService.instance.initialize();
 
   runApp(const ProviderScope(child: AuxiliaApp()));
 }

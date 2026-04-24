@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import '../services/api_service.dart';
+import '../services/fcm_service.dart';
 import '../../shared/models/models.dart';
 
 /// API Service provider
@@ -267,7 +268,12 @@ class OnboardingNotifier extends StateNotifier<OnboardingState> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('rider_id', response.data!.rider.id);
       await prefs.setString('rider_token', response.data!.accessToken);
+      await prefs.setString('rider_phone', response.data!.rider.phone);
       _api.setAuthToken(response.data!.accessToken);
+
+      unawaited(
+        FcmService.instance.syncTopicForPhone(response.data!.rider.phone),
+      );
 
       _ref.invalidate(currentRiderIdProvider);
       _ref.invalidate(currentRiderTokenProvider);
@@ -312,7 +318,11 @@ class OnboardingNotifier extends StateNotifier<OnboardingState> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('rider_id', response.data!.rider.id);
       await prefs.setString('rider_token', response.data!.accessToken);
+      await prefs.setString('rider_phone', response.data!.rider.phone);
       _api.setAuthToken(response.data!.accessToken);
+      unawaited(
+        FcmService.instance.syncTopicForPhone(response.data!.rider.phone),
+      );
       _ref.invalidate(currentRiderIdProvider);
       _ref.invalidate(currentRiderTokenProvider);
       _ref.invalidate(currentRiderProvider);
@@ -321,9 +331,11 @@ class OnboardingNotifier extends StateNotifier<OnboardingState> {
   }
 
   Future<void> logout() async {
+    await FcmService.instance.clearTopicSubscription();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('rider_id');
     await prefs.remove('rider_token');
+    await prefs.remove('rider_phone');
     _api.setAuthToken(null);
     _ref.invalidate(currentRiderIdProvider);
     _ref.invalidate(currentRiderTokenProvider);

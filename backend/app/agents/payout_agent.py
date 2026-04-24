@@ -4,6 +4,7 @@ Handles UPI payouts and notifications
 """
 import asyncio
 import logging
+import re
 import httpx
 from datetime import datetime
 from typing import Dict, Optional, Any
@@ -369,7 +370,7 @@ class PayoutAgent:
                     "trigger": trigger_type,
                     "claim_type": "parametric"
                 },
-                topic=f"rider_{phone}"
+                topic=self._topic_for_phone(phone)
             )
             
             # Send message using Google's official Admin SDK (uses V1 API automatically)
@@ -381,6 +382,12 @@ class PayoutAgent:
         except Exception as e:
             logger.error(f"FCM notification error: {e}")
             return {"success": False, "mode": "fcm_exception"}
+
+    def _topic_for_phone(self, phone: str) -> str:
+        digits = re.sub(r"\D", "", phone or "")
+        if not digits:
+            return "rider_unknown"
+        return f"rider_{digits}"
     
     async def _record_blockchain(
         self,
