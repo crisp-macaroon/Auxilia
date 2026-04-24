@@ -85,7 +85,10 @@ class PolicyScreen extends ConsumerWidget {
                             context.go(AppRoutes.onboarding),
                       );
                     }
-                    return _PolicyActions(policy: effectivePolicy);
+                    return _PolicyActions(
+                      policy: effectivePolicy,
+                      rider: riderAsync.valueOrNull,
+                    );
                   },
                   loading: () => const SizedBox.shrink(),
                   error: (_, _) => const SizedBox.shrink(),
@@ -384,8 +387,9 @@ class _PolicyDetailsCard extends StatelessWidget {
 
 class _PolicyActions extends ConsumerStatefulWidget {
   final Policy policy;
+  final Rider? rider;
 
-  const _PolicyActions({required this.policy});
+  const _PolicyActions({required this.policy, required this.rider});
 
   @override
   ConsumerState<_PolicyActions> createState() => _PolicyActionsState();
@@ -398,6 +402,7 @@ class _PolicyActionsState extends ConsumerState<_PolicyActions> {
   bool _loading = false;
   late final Razorpay _razorpay;
   int? _pendingWeeks;
+  int _pointsToRedeem = 0;
   Map<String, dynamic>? _pendingOrder;
 
   double _quoteForWeeks(int weeks) {
@@ -435,6 +440,7 @@ class _PolicyActionsState extends ConsumerState<_PolicyActions> {
       flowType: 'renew_policy',
       existingPolicyId: widget.policy.id,
       durationDays: weeks * 7,
+      pointsToRedeem: _pointsToRedeem,
     );
 
     if (!mounted) return;
@@ -495,6 +501,7 @@ class _PolicyActionsState extends ConsumerState<_PolicyActions> {
       signature: signature,
       existingPolicyId: widget.policy.id,
       durationDays: weeks * 7,
+      pointsToRedeem: _pointsToRedeem,
     );
 
     if (!mounted) return;
@@ -574,6 +581,7 @@ class _PolicyActionsState extends ConsumerState<_PolicyActions> {
     final daysLeft = widget.policy.daysRemaining;
     final showRenew =
         daysLeft <= 3; // Show renew option when 3 or fewer days left
+    final loyaltyPoints = widget.rider?.loyaltyPoints ?? 0;
     final renewMessage = widget.policy.isActive
         ? 'Your policy expires in $daysLeft day${daysLeft != 1 ? 's' : ''}. Renew now to stay protected.'
         : 'Your last policy has expired. Renew now to restore protection.';
@@ -628,6 +636,41 @@ class _PolicyActionsState extends ConsumerState<_PolicyActions> {
                 ),
               ),
             ),
+          ],
+          if (loyaltyPoints > 0) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Use loyalty points ($loyaltyPoints)',
+                    style: AppTypography.bodySmall.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+                Switch(
+                  value: _pointsToRedeem > 0,
+                  onChanged: _loading
+                      ? null
+                      : (on) {
+                          setState(() {
+                            _pointsToRedeem = on ? loyaltyPoints : 0;
+                          });
+                        },
+                ),
+              ],
+            ),
+            if (_pointsToRedeem > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'Applying $_pointsToRedeem points in renewal checkout.',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.success,
+                  ),
+                ),
+              ),
           ],
           const SizedBox(height: 16),
           Row(

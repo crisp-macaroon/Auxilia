@@ -91,6 +91,7 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
                         name: rider.name,
                         phone: rider.phone,
                         persona: rider.persona,
+                        loyaltyPoints: rider.loyaltyPoints,
                       );
                     },
                     loading: () => const _LoadingCard(),
@@ -1150,11 +1151,13 @@ class _ProfileCard extends StatelessWidget {
   final String name;
   final String phone;
   final String persona;
+  final int loyaltyPoints;
 
   const _ProfileCard({
     required this.name,
     required this.phone,
     required this.persona,
+    required this.loyaltyPoints,
   });
 
   @override
@@ -1222,6 +1225,24 @@ class _ProfileCard extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.stars_rounded,
+                      size: 16,
+                      color: AppColors.warning,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '$loyaltyPoints tokens',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

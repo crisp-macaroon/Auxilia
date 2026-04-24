@@ -21,8 +21,8 @@ def _slugify(value: str) -> str:
 def _preferred_locality_name(reverse) -> str | None:
     if reverse is None:
         return None
-    # Prefer town/city-style names first; suburb/road can be too granular.
-    return reverse.city or reverse.suburb or reverse.road or None
+    # Prefer micro-localities first so rider labels feel nearby and familiar.
+    return reverse.suburb or reverse.road or reverse.city or None
 
 
 async def ensure_placeholder_route_zone(db: AsyncSession, rider: Rider) -> Zone:
