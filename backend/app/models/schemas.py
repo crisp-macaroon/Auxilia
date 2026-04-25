@@ -338,6 +338,7 @@ class WeatherData(BaseModel):
     weather_description: str
     clouds: int
     visibility: int
+    heatwave_flag: bool = False
     timestamp: datetime
 
 

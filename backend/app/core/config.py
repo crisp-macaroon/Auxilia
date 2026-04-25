@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     TRAFFIC_THRESHOLD_PERCENT: float = 60.0
     SURGE_THRESHOLD_MULTIPLIER: float = 2.5
     ROAD_DISRUPTION_THRESHOLD_COUNT: int = 3
+    HEATWAVE_TEMP_THRESHOLD_C: float = 42.0
     # Legacy fallback (deprecated)
     ACCIDENT_THRESHOLD_COUNT: Optional[int] = None
     TRIGGER_POLL_INTERVAL: int = 300

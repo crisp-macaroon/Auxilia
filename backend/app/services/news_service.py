@@ -9,6 +9,7 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
 from app.core.config import settings
 from app.models.schemas import NewsIncident
+from app.services.weather_service import weather_service
 import logging
 import json
 
@@ -52,11 +53,43 @@ class NewsService:
             
             # Use Gemini to analyze articles
             analyzed_incidents = await self._analyze_with_gemini(articles, city, incident_type)
+
+            if incident_type in (None, "weather", "safety"):
+                heatwave_incident = await self._build_heatwave_incident(city)
+                if heatwave_incident:
+                    analyzed_incidents.append(heatwave_incident)
             
             return analyzed_incidents
         except Exception as e:
             logger.error(f"News service error: {e}")
             return []
+
+    async def _build_heatwave_incident(self, city: str) -> Optional[NewsIncident]:
+        """Create a synthetic high-severity incident when live temperature crosses heatwave threshold."""
+        weather = await weather_service.get_weather_by_city(city)
+        if not weather or not weather.heatwave_flag:
+            return None
+
+        location = city if city else settings.DEFAULT_CITY
+        temperature = round(float(weather.temperature), 1)
+        feels_like = round(float(weather.feels_like), 1)
+        threshold = float(settings.HEATWAVE_TEMP_THRESHOLD_C)
+
+        return NewsIncident(
+            title=f"Heatwave Alert in {location}",
+            description=(
+                f"Live weather crossed heat threshold: temp {temperature}C, feels like {feels_like}C "
+                f"(threshold {threshold}C). Delivery risk elevated for riders."
+            ),
+            source="OpenWeatherMap",
+            url="",
+            published_at=datetime.utcnow(),
+            incident_type="weather",
+            severity=0.8,
+            location=location,
+            city=location,
+            is_trigger_relevant=True,
+        )
 
     async def get_macro_incident_score(
         self,
@@ -196,6 +229,7 @@ INCLUDE articles about:
 - Road disruptions (collisions, crashes, closures, diversions, blocked corridors)
 - Traffic disruptions (road blocks, diversions, heavy congestion due to specific events)
 - Weather impacts on roads (flooding, waterlogging, storm damage)
+- Heatwave and extreme-heat conditions affecting rider safety (especially 42C+)
 - Infrastructure issues (unsafe potholes, road cave-ins, bridge issues)
 - Safety incidents on roads (robbery on highways, unsafe areas for riders)
 - Curfews, local shutdowns, or strike-linked access issues affecting deliveries

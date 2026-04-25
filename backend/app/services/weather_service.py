@@ -54,6 +54,10 @@ class WeatherService:
                 weather_description=data["weather"][0]["description"],
                 clouds=data["clouds"]["all"],
                 visibility=data.get("visibility", 10000),
+                heatwave_flag=(
+                    data["main"].get("temp", 0.0) >= settings.HEATWAVE_TEMP_THRESHOLD_C
+                    or data["main"].get("feels_like", 0.0) >= settings.HEATWAVE_TEMP_THRESHOLD_C
+                ),
                 timestamp=datetime.utcnow()
             )
         except httpx.HTTPError as e:
@@ -93,6 +97,10 @@ class WeatherService:
                 weather_description=data["weather"][0]["description"],
                 clouds=data["clouds"]["all"],
                 visibility=data.get("visibility", 10000),
+                heatwave_flag=(
+                    data["main"].get("temp", 0.0) >= settings.HEATWAVE_TEMP_THRESHOLD_C
+                    or data["main"].get("feels_like", 0.0) >= settings.HEATWAVE_TEMP_THRESHOLD_C
+                ),
                 timestamp=datetime.utcnow()
             )
         except Exception as e:
