@@ -8,11 +8,13 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from datetime import datetime, timedelta
 from typing import Any, Dict
 
 import google.generativeai as genai
 
 from app.core.config import settings
+from app.services.gemini_model_resolver import resolve_generate_model_name, build_model
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +25,9 @@ class PayoutAdvisoryService:
     def __init__(self) -> None:
         self._enabled = bool(settings.GEMINI_API_KEY)
         self._model = None
+        self._model_name = ""
+        self._model_refresh_attempted = False
+        self._disabled_until: datetime | None = None
 
         if not self._enabled:
             logger.info("Gemini advisory disabled: GEMINI_API_KEY not set")
@@ -30,7 +35,9 @@ class PayoutAdvisoryService:
 
         try:
             genai.configure(api_key=settings.GEMINI_API_KEY)
-            self._model = genai.GenerativeModel("gemini-1.5-flash")
+            self._model_name = resolve_generate_model_name(default="gemini-1.5-flash")
+            self._model = build_model(self._model_name)
+            logger.info("Gemini payout advisory model selected: %s", self._model_name)
         except Exception as exc:
             logger.error("Failed to initialize Gemini payout advisory model: %s", exc)
             self._enabled = False
@@ -46,6 +53,14 @@ class PayoutAdvisoryService:
           key_risks: [str]
         }
         """
+        if self._disabled_until and datetime.utcnow() < self._disabled_until:
+            return {
+                "recommendation": "manual_review",
+                "confidence": 0.0,
+                "rationale": "Gemini advisory temporarily paused after API quota/rate-limit errors.",
+                "key_risks": ["llm_temporarily_disabled"],
+            }
+
         if not self._enabled or self._model is None:
             return {
                 "recommendation": "manual_review",
@@ -65,6 +80,30 @@ class PayoutAdvisoryService:
                 "key_risks": [str(r).strip() for r in (parsed.get("key_risks") or []) if str(r).strip()],
             }
         except Exception as exc:
+            text = str(exc).lower()
+
+            if ("not found" in text or "not supported" in text) and not self._model_refresh_attempted:
+                self._model_refresh_attempted = True
+                try:
+                    refreshed = resolve_generate_model_name(default="gemini-2.0-flash")
+                    if refreshed != self._model_name:
+                        self._model_name = refreshed
+                        self._model = build_model(self._model_name)
+                        logger.info("Gemini payout advisory switched model to: %s", self._model_name)
+                        raw = await asyncio.to_thread(self._model.generate_content, prompt)
+                        parsed = self._parse_json(raw.text if hasattr(raw, "text") else "")
+                        return {
+                            "recommendation": str(parsed.get("recommendation", "manual_review")).lower(),
+                            "confidence": float(parsed.get("confidence", 0.0) or 0.0),
+                            "rationale": str(parsed.get("rationale", "No rationale provided")).strip(),
+                            "key_risks": [str(r).strip() for r in (parsed.get("key_risks") or []) if str(r).strip()],
+                        }
+                except Exception as retry_exc:
+                    logger.warning("Gemini payout advisory retry failed: %s", retry_exc)
+
+            if any(marker in text for marker in ["resourceexhausted", "quota", "rate limit", "429"]):
+                self._disabled_until = datetime.utcnow() + timedelta(minutes=5)
+
             logger.warning("Gemini payout advisory failed: %s", exc)
             return {
                 "recommendation": "manual_review",

@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from app.core.config import settings
 from app.models.schemas import NewsIncident
 from app.services.weather_service import weather_service
+from app.services.gemini_model_resolver import resolve_generate_model_name, build_model
 import logging
 import json
 
@@ -29,10 +30,23 @@ class NewsService:
         self.client = httpx.AsyncClient(timeout=30.0)
         self._articles_cache: Dict[str, Dict[str, Any]] = {}
         self._cooldown_until: Dict[str, datetime] = {}
+        self._gemini_enabled = bool(settings.GEMINI_API_KEY)
+        self._model_name = ""
+        self._gemini_disabled_until: datetime | None = None
         
         # Initialize Gemini
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        if self._gemini_enabled:
+            try:
+                genai.configure(api_key=settings.GEMINI_API_KEY)
+                self._model_name = resolve_generate_model_name(default="gemini-1.5-flash")
+                self.model = build_model(self._model_name)
+                logger.info("News Gemini model selected: %s", self._model_name)
+            except Exception as exc:
+                logger.warning("News Gemini init failed, disabling LLM analysis: %s", exc)
+                self._gemini_enabled = False
+                self.model = None
+        else:
+            self.model = None
     
     async def search_incidents(
         self, 
@@ -51,8 +65,11 @@ class NewsService:
             if not articles:
                 return []
             
-            # Use Gemini to analyze articles
-            analyzed_incidents = await self._analyze_with_gemini(articles, city, incident_type)
+            # Use Gemini to analyze articles when available
+            analyzed_incidents = []
+            if self._gemini_enabled and self.model is not None:
+                if not self._gemini_disabled_until or datetime.utcnow() >= self._gemini_disabled_until:
+                    analyzed_incidents = await self._analyze_with_gemini(articles, city, incident_type)
 
             if incident_type in (None, "weather", "safety"):
                 heatwave_incident = await self._build_heatwave_incident(city)
@@ -313,6 +330,9 @@ Respond with ONLY valid JSON, no other text."""
             logger.error(f"Failed to parse Gemini response: {e}")
             return []
         except Exception as e:
+            text = str(e).lower()
+            if any(marker in text for marker in ["resourceexhausted", "quota", "rate limit", "429"]):
+                self._gemini_disabled_until = datetime.utcnow() + timedelta(minutes=5)
             logger.error(f"Gemini analysis error: {e}")
             return []
     
